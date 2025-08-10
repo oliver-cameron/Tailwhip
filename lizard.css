@@ -1,3 +1,9 @@
-body{
+body {
     margin: 0;
+    overflow: hidden;
+    /* No scrolling */
+}
+
+html {
+    overflow: hidden;
 }

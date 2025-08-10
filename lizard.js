@@ -1,33 +1,59 @@
 const app = new PIXI.Application();
-await app.init({ background: "#000", resizeTo: window, antialias: true });
+await app.init({ background: "#FFF", resizeTo: window, antialias: true });
 document.body.appendChild(app.canvas);
 const pointCount = 6;
 class Character {
   constructor() {
-    this.bodyShape = [
-      { index: 0, offset: new Point(0, 0) },
-      { index: 1, offset: new Point(0, 0) },
-      { index: 2, offset: new Point(0, 0) },
-      { index: 3, offset: new Point(0, 0) },
-    ];
+    const dub = (p) => {
+      return p.concat(
+        p
+          .map((o) => ({
+            index: o.index,
+            offset: new Point(o.offset.x, -o.offset.y),
+          }))
+          .reverse(),
+      );
+    };
+    this.bodyShape = dub([
+      { index: 5, offset: new Point(0, 4) },
+      { index: 4, offset: new Point(0, 7) },
+      { index: 3, offset: new Point(0, 10) },
+      { index: 2, offset: new Point(-15, 20) },
+      { index: 1, offset: new Point(0, 16) },
+      { index: 0, offset: new Point(0, 20) },
+      { index: 0, offset: new Point(20, 10) },
+    ]);
+
     this.points = Point.origin(pointCount).map((o) =>
       o.add(new Point(Math.random() + 200, Math.random() + 200)),
     );
     this.oldPoints = this.points.map((p) => new Point(p.x, p.y));
   }
   update() {
+    let forward = 5;
     // Character Movement
     if (keys["ArrowLeft"]) {
-      this.points[0].x -= 2;
+      this.points[0] = this.bspace(new Point(3, -2), 0);
+      forward -= 2;
     }
     if (keys["ArrowRight"]) {
-      this.points[0].x += 2;
+      this.points[0] = this.bspace(new Point(forward == 5 ? 3 : -3, 2), 0);
+      forward -= 2;
     }
     if (keys["ArrowUp"]) {
-      this.points[0].y -= 2;
+      this.points[0] = this.bspace(new Point(forward, 0), 0);
     }
-    if (keys["ArrowDown"]) {
-      this.points[0].y += 2;
+    if (keys["KeyQ"]) {
+      this.points[pointCount - 1] = this.bspace(
+        new Point(0, -0.6),
+        pointCount - 1,
+      );
+    }
+    if (keys["KeyE"]) {
+      this.points[pointCount - 1] = this.bspace(
+        new Point(0, 0.6),
+        pointCount - 1,
+      );
     }
     // Body Movement
     for (var i = 0; i < this.points.length; i++) {
@@ -41,7 +67,6 @@ class Character {
         this.points[i],
         this.points[i + 1],
         linelength,
-        0,
       );
     }
     for (var i = 0; i < this.points.length - 2; i++) {
@@ -50,8 +75,8 @@ class Character {
         this.points[i + 1],
         this.points[i + 2],
         linelength,
-        0.5,
-        0.1,
+        0.7,
+        0.3,
       );
     }
   }
@@ -60,7 +85,7 @@ class Character {
     // Find secant line
     const spoints = [
       this.points[index == 0 ? 0 : index - 1],
-      this.points[index == pointCount ? 0 : index + 1],
+      this.points[index == pointCount - 1 ? index : index + 1],
     ];
     const secant = spoints[0].subtract(spoints[1]).normalise();
     // Rotate point by secant point
@@ -73,16 +98,33 @@ class Character {
   draw() {
     let count = this.bodyShape.length;
     let bodyPoints = this.bodyShape.map((p) => {
-      return this.bspace(p.offset, p.index);
+      return { leaf: this.bspace(p.offset, p.index), branch: p.index };
     });
     gfx.lineStyle(2, 0xff0000);
     gfx.moveTo(bodyPoints[0].x, bodyPoints[0].y);
-    for (var i = 1; i < count; i++) {
+    for (var i = 0; i < count; i++) {
       drawKSplineSegment(
-        bodyPoints[i % count],
-        bodyPoints[(i + 1) % count],
-        bodyPoints[(i + 2) % count],
-        bodyPoints[(i + 3) % count],
+        bodyPoints[i % count].leaf,
+        bodyPoints[(i + 1) % count].leaf,
+        bodyPoints[(i + 2) % count].leaf,
+        bodyPoints[(i + 3) % count].leaf,
+      );
+    }
+    gfx.stroke();
+    gfx.closePath();
+    gfx.lineStyle(1, 0x00ff00);
+    gfx.moveTo(this.points[0].x, this.points[0].y);
+    for (let i = 0; i < this.points.length; i++) {
+      gfx.lineTo(this.points[i].x, this.points[i].y);
+    }
+    gfx.stroke();
+    gfx.closePath();
+    gfx.lineStyle(1, 0x0000ff);
+    for (let i = 0; i < bodyPoints.length; i++) {
+      gfx.moveTo(bodyPoints[i].leaf.x, bodyPoints[i].leaf.y);
+      gfx.lineTo(
+        this.points[bodyPoints[i].branch].x,
+        this.points[bodyPoints[i].branch].y,
       );
     }
     gfx.stroke();
@@ -158,7 +200,6 @@ function drawCharacter(time) {
   gfx.clear();
   player.update();
   player.draw();
-  gfx.stroke({ color: 0xff0000, pixelLine: true });
 }
 function drawKSplineSegment(p0, p1, p2, p3) {
   // Convert to Bézier control points
@@ -172,7 +213,12 @@ function drawKSplineSegment(p0, p1, p2, p3) {
     y: 0.25 * p1.y + p2.y - 0.25 * p3.y,
   };
   let b3 = p2;
-  gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
+  gfx.moveTo(b0.x, b0.y);
+  gfx.bezierCurveTo(/*b0.x, b0.y,*/ b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
+  // gfx.lineTo(b0.x, b0.y);
+  // gfx.lineTo(b1.x, b1.y);
+  // gfx.lineTo(b2.x, b2.y);
+  // gfx.lineTo(b3.x, b3.y);
 }
 app.ticker.add((delta) => {
   drawCharacter(performance.now());
@@ -187,6 +233,6 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   keys[e.code] = false;
 });
-window.logCharacter = () => {
-  console.log(player);
+window.breakEval = (statement) => {
+  eval(statement);
 };
