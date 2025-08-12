@@ -1,7 +1,4 @@
-const app = new PIXI.Application();
-await app.init({ background: "#FFF", resizeTo: window, antialias: true });
-document.body.appendChild(app.canvas);
-const pointCount = 6;
+// Classes
 class Character {
   constructor() {
     const dub = (p) => {
@@ -32,26 +29,27 @@ class Character {
   update() {
     let forward = 5;
     // Character Movement
-    if (keys["ArrowLeft"]) {
-      this.points[0] = this.bspace(new Point(3, -2), 0);
-      forward -= 2;
+    if (keys["KeyA"]) {
+      this.points[0].x -= 5;
     }
-    if (keys["ArrowRight"]) {
-      this.points[0] = this.bspace(new Point(forward == 5 ? 3 : -3, 2), 0);
-      forward -= 2;
+    if (keys["KeyD"]) {
+      this.points[0].x += 5;
     }
-    if (keys["ArrowUp"]) {
-      this.points[0] = this.bspace(new Point(forward, 0), 0);
+    if (keys["KeyW"]) {
+      this.points[0].y -= 5;
+    }
+    if (keys["KeyS"]) {
+      this.points[0].y += 5;
     }
     if (keys["KeyQ"]) {
       this.points[pointCount - 1] = this.bspace(
-        new Point(0, -0.6),
+        new Point(0, -5),
         pointCount - 1,
       );
     }
     if (keys["KeyE"]) {
       this.points[pointCount - 1] = this.bspace(
-        new Point(0, 0.6),
+        new Point(0, 5),
         pointCount - 1,
       );
     }
@@ -192,6 +190,11 @@ class Point {
     return p1.x * p2.x + p1.y * p2.y;
   }
 }
+// Main Application
+const app = new PIXI.Application();
+await app.init({ background: "#FFF", resizeTo: window, antialias: true });
+document.body.appendChild(app.canvas);
+const pointCount = 6;
 var linelength = 50;
 var keys = {};
 var player = new Character();
@@ -214,11 +217,7 @@ function drawKSplineSegment(p0, p1, p2, p3) {
   };
   let b3 = p2;
   gfx.moveTo(b0.x, b0.y);
-  gfx.bezierCurveTo(/*b0.x, b0.y,*/ b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
-  // gfx.lineTo(b0.x, b0.y);
-  // gfx.lineTo(b1.x, b1.y);
-  // gfx.lineTo(b2.x, b2.y);
-  // gfx.lineTo(b3.x, b3.y);
+  gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
 }
 app.ticker.add((delta) => {
   drawCharacter(performance.now());
