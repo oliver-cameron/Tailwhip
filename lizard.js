@@ -32,6 +32,7 @@ class Character {
     if (keys["KeyA"]) {
       this.points[0].x -= 5;
     }
+     
     if (keys["KeyD"]) {
       this.points[0].x += 5;
     }
@@ -41,13 +42,13 @@ class Character {
     if (keys["KeyS"]) {
       this.points[0].y += 5;
     }
-    if (keys["KeyQ"]) {
+    if (keys["KeyJ"]) {
       this.points[pointCount - 1] = this.bspace(
         new Point(0, -5),
         pointCount - 1,
       );
     }
-    if (keys["KeyE"]) {
+    if (keys["KeyL"]) {
       this.points[pointCount - 1] = this.bspace(
         new Point(0, 5),
         pointCount - 1,
@@ -193,7 +194,7 @@ class Point {
 // Main Application
 const app = new PIXI.Application();
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
-document.body.appendChild(app.canvas);
+document.getElementById("graphics").appendChild(app.canvas)
 const pointCount = 6;
 var linelength = 50;
 var keys = {};
@@ -235,3 +236,28 @@ window.addEventListener("keyup", (e) => {
 window.breakEval = (statement) => {
   eval(statement);
 };
+
+// this is old movement code
+//  if (keys["ArrowLeft"]) {
+//       this.points[0] = this.bspace(new Point(3, -2), 0);
+//       forward -= 2;
+//     }
+//     if (keys["ArrowRight"]) {
+//       this.points[0] = this.bspace(new Point(forward == 5 ? 3 : -3, 2), 0);
+//       forward -= 2;
+//     }
+//     if (keys["ArrowUp"]) {
+//       this.points[0] = this.bspace(new Point(forward, 0), 0);
+//     }
+//     if (keys["KeyQ"]) {
+//       this.points[pointCount - 1] = this.bspace(
+//         new Point(0, -0.6),
+//         pointCount - 1,
+//       );
+//     }
+//     if (keys["KeyE"]) {
+//       this.points[pointCount - 1] = this.bspace(
+//         new Point(0, 0.6),
+//         pointCount - 1,
+//       );
+//     }
