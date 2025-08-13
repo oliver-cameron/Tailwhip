@@ -20,7 +20,12 @@ class Character {
       { index: 0, offset: new Point(0, 20) },
       { index: 0, offset: new Point(20, 10) },
     ]);
-
+    this.arms = {
+      leftArm: Array.from({ length: 3 }, () => new Point(0, 0)),
+      rightArm: Array.from({ length: 3 }, () => new Point(0, 0)),
+      leftLeg: Array.from({ length: 3 }, () => new Point(0, 0)),
+      rightLeg: Array.from({ length: 3 }, () => new Point(0, 0))
+    }
     this.points = Point.origin(pointCount).map((o) =>
       o.add(new Point(Math.random() + 200, Math.random() + 200)),
     );
@@ -77,6 +82,38 @@ class Character {
         0.3,
       );
     }
+    // Arms and legs
+    const limbDefs = [
+      { name: "leftArm", index: 1, offset: new Point(0, -5), resetOffset: new Point(-5, -30), sign: -1 },
+      { name: "rightArm", index: 1, offset: new Point(0, 5), resetOffset: new Point(5, 30), sign: 1 },
+      { name: "leftLeg", index: 3, offset: new Point(0, -5), resetOffset: new Point(-5, -30), sign: 1 },
+      { name: "rightLeg", index: 3, offset: new Point(0, 5), resetOffset: new Point(5, 30), sign: -1 },
+    ];
+    let armTravel = 60;
+    for (const limb of limbDefs) {
+      this.arms[limb.name][0] = this.bspace(limb.offset, limb.index);
+      if (
+      this.arms[limb.name][2]
+        .subtract(this.bspace(limb.resetOffset, limb.index))
+        .length() > armTravel
+      ) {
+      this.arms[limb.name][2] = this.bspace(limb.resetOffset, limb.index);
+      }
+      let secant = this.arms[limb.name][0].subtract(this.arms[limb.name][2]);
+      let angle = Math.acos(secant.length() / (2 * armLength));
+      let toPoint = (a, sign) => new Point(Math.cos(a), Math.sin(a) * sign);
+      let multiplyPoint = (p1, p2) =>
+      new Point(
+        p1.x * p2.x - p1.y * p2.y,
+        p1.x * p2.y + p1.y * p2.x
+      );
+      this.arms[limb.name][1] = multiplyPoint(
+      toPoint(angle, limb.sign),
+      secant.normalise()
+      )
+      .multiply(-armLength)
+      .add(this.arms[limb.name][0]);
+    }
   }
   // Body Space
   bspace(point, index) {
@@ -93,6 +130,7 @@ class Character {
     );
     return rpoint.add(this.points[index]);
   }
+
   draw() {
     let count = this.bodyShape.length;
     let bodyPoints = this.bodyShape.map((p) => {
@@ -126,6 +164,21 @@ class Character {
       );
     }
     gfx.stroke();
+    gfx.closePath();
+    // Draw arms
+    gfx.lineStyle(2, 0xff00ff);
+    for(let arm of Object.values(this.arms)) {
+      gfx.moveTo(arm[0].x, arm[0].y);
+      for (let i = 1; i < arm.length; i++) {
+        gfx.lineTo(arm[i].x, arm[i].y);
+      }
+    }
+    gfx.stroke();
+    gfx.closePath();
+    gfx.lineStyle(2,0x00ffff);
+    gfx.moveTo(this.bspace(new Point(0,0), 1))
+    gfx.lineTo(this.bspace(new Point(0, -5), 1));
+    gfx.stroke()
     gfx.closePath();
   }
   static scale(p1, p2, dist) {
@@ -196,6 +249,7 @@ await app.init({ background: "#FFF", resizeTo: window, antialias: true });
 document.body.appendChild(app.canvas);
 const pointCount = 6;
 var linelength = 50;
+let armLength = 40;
 var keys = {};
 var player = new Character();
 let gfx = new PIXI.Graphics();
