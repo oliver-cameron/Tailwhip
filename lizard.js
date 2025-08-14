@@ -220,10 +220,12 @@ function drawKSplineSegment(p0, p1, p2, p3) {
   gfx.moveTo(b0.x, b0.y);
   gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
 }
-app.ticker.add((delta) => {
+window.play = () => {
+  app.stage.addChild(gfx);
+  app.ticker.add((delta) => {
   drawCharacter(performance.now());
 });
-app.stage.addChild(gfx);
+}
 window.addEventListener("resize", () => {
   app.resize();
 });
@@ -236,6 +238,11 @@ window.addEventListener("keyup", (e) => {
 window.breakEval = (statement) => {
   eval(statement);
 };
+window.addEventListener("DOMContentLoaded", () => {
+  var aud = document.getElementById("lizardmusic");
+  aud.volume = 0.5; // Set volume to 50%
+  aud.play()
+})
 
 // this is old movement code
 //  if (keys["ArrowLeft"]) {
