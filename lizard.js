@@ -11,6 +11,40 @@ class Character {
           .reverse(),
       );
     };
+    this.limbDefs = [
+      {
+        name: "leftArm",
+        index: 1,
+        offset: new Point(0, -15),
+        resetOffset: new Point(-5, -60),
+        sign: -1,
+        returning: false,
+      },
+      {
+        name: "rightArm",
+        index: 1,
+        offset: new Point(0, 15),
+        resetOffset: new Point(5, 60),
+        sign: 1,
+        returning: false,
+      },
+      {
+        name: "leftLeg",
+        index: 3,
+        offset: new Point(0, -5),
+        resetOffset: new Point(-5, -50),
+        sign: 1,
+        returning: false,
+      },
+      {
+        name: "rightLeg",
+        index: 3,
+        offset: new Point(0, 5),
+        resetOffset: new Point(5, 50),
+        sign: -1,
+        returning: false,
+      },
+    ];
     this.bodyShape = dub([
       { index: 5, offset: new Point(0, 4) },
       { index: 4, offset: new Point(0, 7) },
@@ -25,15 +59,23 @@ class Character {
       rightArm: Array.from({ length: 3 }, () => new Point(0, 0)),
       leftLeg: Array.from({ length: 3 }, () => new Point(0, 0)),
       rightLeg: Array.from({ length: 3 }, () => new Point(0, 0)),
-      lArmReturn: false,
-      rArmReturn: false,
-      lLegReturn: false,
-      rLegReturn: false,
     };
     this.points = Point.origin(pointCount).map((o) =>
-      o.add(new Point(Math.random() + 200, Math.random() + 200)),
+      o.add(new Point(Math.random() + 500, Math.random() + 500)),
     );
     this.oldPoints = this.points.map((p) => new Point(p.x, p.y));
+    // Initialize arms
+    for (var limb of this.limbDefs) {
+      this.arms[limb.name][0] = this.fromBSpace(limb.offset, limb.index);
+      this.arms[limb.name][2] = this.fromBSpace(limb.resetOffset, limb.index);
+      this.arms[limb.name][1] = Point.midpoint(
+        this.arms[limb.name][0],
+        this.arms[limb.name][2],
+      );
+      //   .multiply(-armLength)
+      //   .add(this.arms[limb.name][0]);
+      limb.pointMap = this.resetOffset;
+    }
   }
   update() {
     let forward = 5;
@@ -41,7 +83,7 @@ class Character {
     if (keys["KeyA"]) {
       this.points[0].x -= 5;
     }
-     
+
     if (keys["KeyD"]) {
       this.points[0].x += 5;
     }
@@ -52,13 +94,13 @@ class Character {
       this.points[0].y += 5;
     }
     if (keys["KeyJ"]) {
-      this.points[pointCount - 1] = this.bspace(
+      this.points[pointCount - 1] = this.fromBSpace(
         new Point(0, -5),
         pointCount - 1,
       );
     }
     if (keys["KeyL"]) {
-      this.points[pointCount - 1] = this.bspace(
+      this.points[pointCount - 1] = this.fromBSpace(
         new Point(0, 5),
         pointCount - 1,
       );
@@ -89,73 +131,44 @@ class Character {
     }
     let multiplyPoint = (p1, p2) =>
       new Point(p1.x * p2.x - p1.y * p2.y, p1.x * p2.y + p1.y * p2.x);
+    gfx.lineStyle(2, 0x8800ff);
     // Arms and legs
-    const limbDefs = [
-      {
-        name: "leftArm",
-        index: 1,
-        offset: new Point(0, -15),
-        resetOffset: new Point(-5, -60),
-        sign: -1,
-        returning: "lArmReturn",
-      },
-      {
-        name: "rightArm",
-        index: 1,
-        offset: new Point(0, 15),
-        resetOffset: new Point(5, 60),
-        sign: 1,
-        returning: "rArmReturn",
-      },
-      {
-        name: "leftLeg",
-        index: 3,
-        offset: new Point(0, -5),
-        resetOffset: new Point(-5, -50),
-        sign: 1,
-        returning: "lLegReturn",
-      },
-      {
-        name: "rightLeg",
-        index: 3,
-        offset: new Point(0, 5),
-        resetOffset: new Point(5, 50),
-        sign: -1,
-        returning: "rLegReturn",
-      },
-    ];
     let armTravel = 30;
-    for (const limb of limbDefs) {
-      this.arms[limb.name][0] = this.bspace(limb.offset, limb.index);
+
+    for (var limb of this.limbDefs) {
+      if (limb.returning) {
+        this.arms[limb.name][2] = this.fromBSpace(limb.pointMap, limb.index);
+      }
+      this.arms[limb.name][0] = this.fromBSpace(limb.offset, limb.index);
       if (
         this.arms[limb.name][2]
-          .subtract(this.bspace(limb.resetOffset, limb.index))
-          .length() > armTravel
+          .subtract(this.fromBSpace(limb.resetOffset, limb.index))
+          .length() > armTravel ||
+        // If the first segment of the arm is inside the body
+        this.toBSpace(this.arms[limb.name][1], limb.index).y < limb.offset.y ||
+        // If the second segment of the arm is inside the body
+        this.toBSpace(this.arms[limb.name][2], limb.index).y < limb.offset.y
       ) {
-        this.arms[limb.returning] = true;
+        limb.returning = true;
       }
-      if(        this.arms[limb.name][2]
-          .subtract(this.bspace(limb.offset, limb.index))
-          .length() > (2 * armLength)
-        ){
+      if (
+        this.arms[limb.name][2]
+          .subtract(this.fromBSpace(limb.offset, limb.index))
+          .length() >
+        2 * armLength
+      ) {
         this.arms[limb.name][2] = Character.scale(
           this.arms[limb.name][0],
           this.arms[limb.name][2],
           armLength,
-        )
+        );
       }
       if (
         this.arms[limb.name][2]
-          .subtract(this.bspace(limb.resetOffset, limb.index))
+          .subtract(this.fromBSpace(limb.resetOffset, limb.index))
           .length() < 5
       ) {
-        this.arms[limb.returning] = false;
-      }
-      let t = 0.1;
-      if (this.arms[limb.returning]) {
-        this.arms[limb.name][2] = this.arms[limb.name][2]
-          .multiply(1 - t)
-          .add(this.bspace(limb.resetOffset, limb.index).multiply(t));
+        limb.returning = false;
       }
 
       let secant = this.arms[limb.name][0].subtract(this.arms[limb.name][2]);
@@ -168,9 +181,58 @@ class Character {
         .multiply(-armLength)
         .add(this.arms[limb.name][0]);
     }
+    let t = 0.4;
+    if (limb.returning) {
+      let targetHand = this.fromBSpace(limb.resetOffset, limb.index);
+      let targetOffset = this.fromBSpace(limb.offset, limb.index);
+      let dlength =
+        targetOffset.subtract(targetHand).length() / (armLength * 2);
+      let normLength = targetOffset.subtract(targetHand).normalise();
+      let doff = Math.acos(dlength);
+      let toPoint = (a, sign) => new Point(Math.cos(a), Math.sin(a) * sign);
+      let destJoint = multiplyPoint(toPoint(doff, limb.sign), normLength)
+        .multiply(-armLength)
+        .add(targetOffset);
+      let theta1 = Math.acos(
+        Point.dotProduct(
+          this.arms[limb.name][1].subtract(this.arms[limb.name][0]).normalise(),
+          destJoint.subtract(this.arms[limb.name][0]).normalise(),
+        ),
+      );
+      let theta2 = Math.acos(
+        Point.dotProduct(
+          this.arms[limb.name][2].subtract(this.arms[limb.name][1]).normalise(),
+          targetOffset.subtract(destJoint).normalise(),
+        ),
+      );
+      this.arms[limb.name][1] = Point.lerp(
+        this.arms[limb.name][1],
+        destJoint,
+        this.sl(t, theta1),
+      );
+      this.arms[limb.name][2] = Point.lerp(
+        this.arms[limb.name][2].subtract(this.arms[limb.name][1]),
+        targetHand.subtract(destJoint),
+        this.sl(t, theta2),
+      ).add(this.arms[limb.name][1]);
+      gfx.moveTo(targetOffset.x, targetOffset.y);
+      gfx.lineTo(destJoint.x, destJoint.y);
+      gfx.lineTo(targetHand.x, targetHand.y);
+    }
+    gfx.stroke();
+    gfx.closePath();
+    limb.pointMap = this.toBSpace(this.arms[limb.name][2], limb.index);
   }
+  sl(t, theta) {
+    return (
+      Math.tan(t * theta) /
+      (Math.sin(theta) + (1 - Math.cos(theta)) * Math.tan(t * theta))
+    );
+  }
+  // Inverse Kinematics
+  IK() {}
   // Body Space
-  bspace(point, index) {
+  fromBSpace(point, index) {
     // Find secant line
     const spoints = [
       this.points[index == 0 ? 0 : index - 1],
@@ -184,11 +246,27 @@ class Character {
     );
     return rpoint.add(this.points[index]);
   }
-
+  // Convert from world space to body space
+  // This is the inverse of fromBSpace
+  toBSpace(point, index) {
+    // Find secant line
+    const spoints = [
+      this.points[index == 0 ? 0 : index - 1],
+      this.points[index == pointCount - 1 ? index : index + 1],
+    ];
+    const secant = spoints[0].subtract(spoints[1]).normalise();
+    // Rotate point by secant point
+    var subPoint = point.subtract(this.points[index]);
+    var rpoint = new Point(
+      secant.x * subPoint.x + secant.y * subPoint.y,
+      -secant.x * subPoint.y + secant.y * subPoint.x,
+    );
+    return rpoint;
+  }
   draw() {
     let count = this.bodyShape.length;
     let bodyPoints = this.bodyShape.map((p) => {
-      return { leaf: this.bspace(p.offset, p.index), branch: p.index };
+      return { leaf: this.fromBSpace(p.offset, p.index), branch: p.index };
     });
     gfx.lineStyle(2, 0xff0000);
     gfx.moveTo(bodyPoints[0].x, bodyPoints[0].y);
@@ -232,14 +310,17 @@ class Character {
     gfx.closePath();
 
     gfx.lineStyle(2, 0xffff00);
-    for(let armName of ["leftArm", "rightArm", "leftLeg", "rightLeg"]){
+    for (let armName of ["leftArm", "rightArm", "leftLeg", "rightLeg"]) {
       let arm = this.arms[armName];
       gfx.moveTo(arm[0].x, arm[0].y);
       gfx.bezierCurveTo(
-        arm[1].x, arm[1].y,
-        arm[1].x, arm[1].y,
-        arm[2].x, arm[2].y, 
-      )
+        arm[1].x,
+        arm[1].y,
+        arm[1].x,
+        arm[1].y,
+        arm[2].x,
+        arm[2].y,
+      );
     }
     gfx.stroke();
     gfx.closePath();
@@ -310,11 +391,14 @@ class Point {
   static dotProduct(p1, p2) {
     return p1.x * p2.x + p1.y * p2.y;
   }
+  static lerp(a, b, t) {
+    return new Point(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+  }
 }
 // Main Application
 const app = new PIXI.Application();
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
-document.getElementById("graphics").appendChild(app.canvas)
+document.getElementById("graphics").appendChild(app.canvas);
 const pointCount = 6;
 var linelength = 50;
 let armLength = 40;
@@ -344,9 +428,9 @@ function drawKSplineSegment(p0, p1, p2, p3) {
 window.play = () => {
   app.stage.addChild(gfx);
   app.ticker.add((delta) => {
-  drawCharacter(performance.now());
-});
-}
+    drawCharacter(performance.now());
+  });
+};
 window.addEventListener("resize", () => {
   app.resize();
 });
@@ -362,8 +446,8 @@ window.breakEval = (statement) => {
 window.addEventListener("DOMContentLoaded", () => {
   var aud = document.getElementById("lizardmusic");
   aud.volume = 0.5; // Set volume to 50%
-  aud.play()
-})
+  aud.play();
+});
 
 // this is old movement code
 //  if (keys["ArrowLeft"]) {
@@ -389,3 +473,4 @@ window.addEventListener("DOMContentLoaded", () => {
 //         pointCount - 1,
 //       );
 //     }
+app.ticker.maxFPS = 1;
