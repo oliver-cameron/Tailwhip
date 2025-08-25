@@ -133,7 +133,7 @@ class Character {
       new Point(p1.x * p2.x - p1.y * p2.y, p1.x * p2.y + p1.y * p2.x);
     gfx.lineStyle(2, 0x8800ff);
     // Arms and legs
-    let armTravel = 30;
+    let armTravel = 50;
 
     for (var limb of this.limbDefs) {
       if (limb.returning) {
@@ -151,6 +151,7 @@ class Character {
       ) {
         limb.returning = true;
       }
+      // Enforce arm length
       if (
         this.arms[limb.name][2]
           .subtract(this.fromBSpace(limb.offset, limb.index))
@@ -170,7 +171,7 @@ class Character {
       ) {
         limb.returning = false;
       }
-
+      // Calculate joint position using circle intersection
       let secant = this.arms[limb.name][0].subtract(this.arms[limb.name][2]);
       let angle = Math.acos(secant.length() / (2 * armLength));
       let toPoint = (a, sign) => new Point(Math.cos(a), Math.sin(a) * sign);
@@ -180,48 +181,52 @@ class Character {
       )
         .multiply(-armLength)
         .add(this.arms[limb.name][0]);
-    }
-    let t = 0.4;
-    if (limb.returning) {
-      let targetHand = this.fromBSpace(limb.resetOffset, limb.index);
-      let targetOffset = this.fromBSpace(limb.offset, limb.index);
-      let dlength =
-        targetOffset.subtract(targetHand).length() / (armLength * 2);
-      let normLength = targetOffset.subtract(targetHand).normalise();
-      let doff = Math.acos(dlength);
-      let toPoint = (a, sign) => new Point(Math.cos(a), Math.sin(a) * sign);
-      let destJoint = multiplyPoint(toPoint(doff, limb.sign), normLength)
-        .multiply(-armLength)
-        .add(targetOffset);
-      let theta1 = Math.acos(
-        Point.dotProduct(
-          this.arms[limb.name][1].subtract(this.arms[limb.name][0]).normalise(),
-          destJoint.subtract(this.arms[limb.name][0]).normalise(),
-        ),
-      );
-      let theta2 = Math.acos(
-        Point.dotProduct(
-          this.arms[limb.name][2].subtract(this.arms[limb.name][1]).normalise(),
-          targetOffset.subtract(destJoint).normalise(),
-        ),
-      );
-      this.arms[limb.name][1] = Point.lerp(
-        this.arms[limb.name][1],
-        destJoint,
-        this.sl(t, theta1),
-      );
-      this.arms[limb.name][2] = Point.lerp(
-        this.arms[limb.name][2].subtract(this.arms[limb.name][1]),
-        targetHand.subtract(destJoint),
-        this.sl(t, theta2),
-      ).add(this.arms[limb.name][1]);
-      gfx.moveTo(targetOffset.x, targetOffset.y);
-      gfx.lineTo(destJoint.x, destJoint.y);
-      gfx.lineTo(targetHand.x, targetHand.y);
+      let t = 0.5;
+      if (limb.returning) {
+        let targetHand = this.fromBSpace(limb.resetOffset, limb.index);
+        let targetOffset = this.fromBSpace(limb.offset, limb.index);
+        let dlength =
+          targetOffset.subtract(targetHand).length() / (armLength * 2);
+        let normLength = targetOffset.subtract(targetHand).normalise();
+        let doff = Math.acos(dlength);
+        let toPoint = (a, sign) => new Point(Math.cos(a), Math.sin(a) * sign);
+        let destJoint = multiplyPoint(toPoint(doff, limb.sign), normLength)
+          .multiply(-armLength)
+          .add(targetOffset);
+        let theta1 = Math.acos(
+          Point.dotProduct(
+            this.arms[limb.name][1]
+              .subtract(this.arms[limb.name][0])
+              .normalise(),
+            destJoint.subtract(this.arms[limb.name][0]).normalise(),
+          ),
+        );
+        let theta2 = Math.acos(
+          Point.dotProduct(
+            this.arms[limb.name][2]
+              .subtract(this.arms[limb.name][1])
+              .normalise(),
+            targetOffset.subtract(destJoint).normalise(),
+          ),
+        );
+        this.arms[limb.name][1] = Point.lerp(
+          this.arms[limb.name][1],
+          destJoint,
+          this.sl(t, theta1),
+        );
+        this.arms[limb.name][2] = Point.lerp(
+          this.arms[limb.name][2].subtract(this.arms[limb.name][1]),
+          targetHand.subtract(destJoint),
+          this.sl(t, theta2),
+        ).add(this.arms[limb.name][1]);
+        gfx.moveTo(targetOffset.x, targetOffset.y);
+        gfx.lineTo(destJoint.x, destJoint.y);
+        gfx.lineTo(targetHand.x, targetHand.y);
+      }
+      limb.pointMap = this.toBSpace(this.arms[limb.name][2], limb.index);
     }
     gfx.stroke();
     gfx.closePath();
-    limb.pointMap = this.toBSpace(this.arms[limb.name][2], limb.index);
   }
   sl(t, theta) {
     return (
@@ -259,7 +264,7 @@ class Character {
     var subPoint = point.subtract(this.points[index]);
     var rpoint = new Point(
       secant.x * subPoint.x + secant.y * subPoint.y,
-      -secant.x * subPoint.y + secant.y * subPoint.x,
+      secant.x * subPoint.y - secant.y * subPoint.x,
     );
     return rpoint;
   }
@@ -473,4 +478,4 @@ window.addEventListener("DOMContentLoaded", () => {
 //         pointCount - 1,
 //       );
 //     }
-app.ticker.maxFPS = 1;
+// app.ticker.maxFPS = 1;
