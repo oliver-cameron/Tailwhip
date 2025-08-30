@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "outDir": "dist",
+    // "rootDir": "src",
+    "typeRoots": ["./types"]
+  },
+  "include": [
+    "types/**/*",
+    "scriptsDev/**/*",
+    "server.js",
+    "index.html",
+    "pixi.min.js"
+  ]
+}

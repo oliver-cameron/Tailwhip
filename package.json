@@ -1,0 +1,8 @@
+{
+  "name": "lizard",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "scripts": {
+    "serverDev": "bun --watch --ignore\"jsProd/**\" server.js"
+  }
+}

@@ -1,12 +1,24 @@
+await Bun.build({
+  entrypoints: ["./scriptsDev/**/*.tsx", "./scriptsDev/**/*.ts"],
+  target: "browser",
+  outdir: "./scriptsProd",
+});
 Bun.serve({
   port: 8000,
-  routes: {
-    "/index.html": new Response(await Bun.file("./index.html").bytes()),
-    "/index.css": new Response(await Bun.file("./index.css").bytes()),
-    "/lizard.js": new Response(await Bun.file("./lizard.js").bytes(), {
-      headers: { "Content-Type": "application/javascript" },
-    }),
-    "/pixi.min.js": new Response(await Bun.file("./pixi.min.js").bytes()),
-    "/*": new Response("404 Not Found", { status: 404 }),
+  fetch(req) {
+    switch (req.url.pathname) {
+      case "/":
+        return new Response(Bun.file("./index.html"));
+      case "/index.css":
+        return new Response(Bun.file("./index.css"));
+      case "/lizard.js":
+        return new Response(Bun.file("./scriptsProd/lizard.js"), {
+          headers: { "Content-Type": "application/javascript" },
+        });
+      case "/pixi.min.js":
+        return new Response(Bun.file("./pixi.min.js"));
+      default:
+        return new Response("404 Not Found", { status: 404 });
+    }
   },
 });
