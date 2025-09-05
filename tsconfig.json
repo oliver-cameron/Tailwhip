@@ -4,7 +4,11 @@
     "module": "ESNext",
     "outDir": "dist",
     // "rootDir": "src",
-    "typeRoots": ["./types"]
+    "typeRoots": ["./types"],
+    "jsx": "preserve",
+    // "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "noEmit": false
   },
   "include": [
     "types/**/*",

@@ -1,4 +1,4 @@
-class Point {
+export class Point {
   x: number;
   y: number;
   constructor(x: number, y: number) {
@@ -39,7 +39,7 @@ class Point {
   static zero = new Point(0, 0);
 }
 // A cubic bezier curve
-class Curve {
+export class Curve {
   p0: Point;
   p1: Point;
   p2: Point;
@@ -166,7 +166,7 @@ class Curve {
     return returner;
   }
 }
-var other = {
+export var other = {
   // Gives t value across endpoints of an arc, given the angle of the arc and t value across the arc, such that
   // the lerp of the endpoints, normalised gives the same point as the arc at t.
   sl(t: number, s: number, c: number): number {
@@ -180,7 +180,14 @@ var other = {
     return p1.add(vec.scale(distance / len));
   },
   // A spring function that makes nuges a vector into the same direction as another vector, both of which have roughly the same length.
-  spring(p1: Point, p2: Point, p3: Point, critAngle: number, t: number): Point {
+  spring(
+    p1: Point,
+    p2: Point,
+    p3: Point,
+    critAngle: number,
+    t: number,
+    deltaTime: number,
+  ): Point {
     let vec1 = p2.subtract(p1);
     var vec2 = p3.subtract(p2);
     let currAngCos = vec1.normalise().dotProduct(vec2.normalise());
@@ -221,4 +228,4 @@ var other = {
     );
   },
 };
-let geo = { Point, Curve, other };
+export default { Point, Curve, other };
