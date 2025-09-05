@@ -221,4 +221,4 @@ var other = {
     );
   },
 };
-export let geo = { Point, Curve, other };
+let geo = { Point, Curve, other };
