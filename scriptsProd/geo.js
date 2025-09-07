@@ -117,8 +117,8 @@ class Curve {
 var other = {
   sl(t, s, c) {
     const tan = s / c;
-    const tTan = Math.tan(Math.atan(tan) * t);
-    return tTan / (s + 1 - c * tTan);
+    const tTan = Math.tan(Math.atan2(s, c) * t);
+    return tTan / (s + (1 - c) * tTan);
   },
   lockDist(p1, p2, distance) {
     let vec = p2.subtract(p1);
@@ -130,11 +130,10 @@ var other = {
     var vec2 = p3.subtract(p2);
     let currAngCos = vec1.normalise().dotProduct(vec2.normalise());
     let currAngSin = vec1.normalise().crossProduct(vec2.normalise());
-    let newVec = new Point(currAngCos, currAngSin);
-    if (critAngle < currAngCos) {
-      newVec = Point.lerp(newVec, new Point(1, 0), this.sl(t, currAngSin, currAngCos));
+    let angleVec = new Point(currAngCos, currAngSin);
+    if (critAngle > currAngCos) {
+      vec2 = Point.lerp(vec2, vec1, this.sl(t, currAngSin, currAngCos)).normalise().scale(vec1.length());
     }
-    vec2 = newVec.geoProduct(vec1.normalise()).scale(vec2.length());
     return p2.add(vec2);
   },
   toBSpace(point, offset, rotator) {

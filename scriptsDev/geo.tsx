@@ -171,8 +171,8 @@ export var other = {
   // the lerp of the endpoints, normalised gives the same point as the arc at t.
   sl(t: number, s: number, c: number): number {
     const tan: number = s / c;
-    const tTan = Math.tan(Math.atan(tan) * t);
-    return tTan / (s + 1 - c * tTan);
+    const tTan = Math.tan(Math.atan2(s, c) * t);
+    return tTan / (s + (1 - c) * tTan);
   },
   lockDist(p1: Point, p2: Point, distance: number): Point {
     let vec = p2.subtract(p1);
@@ -192,15 +192,13 @@ export var other = {
     var vec2 = p3.subtract(p2);
     let currAngCos = vec1.normalise().dotProduct(vec2.normalise());
     let currAngSin = vec1.normalise().crossProduct(vec2.normalise());
-    let newVec = new Point(currAngCos, currAngSin);
-    if (critAngle < currAngCos) {
-      newVec = Point.lerp(
-        newVec,
-        new Point(1, 0),
-        this.sl(t, currAngSin, currAngCos),
-      );
+    let angleVec = new Point(currAngCos, currAngSin);
+    if (critAngle > currAngCos) {
+      vec2 = Point.lerp(vec2, vec1, this.sl(t, currAngSin, currAngCos))
+        .normalise()
+        .scale(vec1.length());
+      // newVec = new Point(newVec.x, -newVec.y);
     }
-    vec2 = newVec.geoProduct(vec1.normalise()).scale(vec2.length());
     return p2.add(vec2);
   },
   toBSpace(point: Point, offset: Point, rotator: Point): Point {

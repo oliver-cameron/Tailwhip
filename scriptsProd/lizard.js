@@ -117,8 +117,8 @@ class Curve {
 var other = {
   sl(t, s, c) {
     const tan = s / c;
-    const tTan = Math.tan(Math.atan(tan) * t);
-    return tTan / (s + 1 - c * tTan);
+    const tTan = Math.tan(Math.atan2(s, c) * t);
+    return tTan / (s + (1 - c) * tTan);
   },
   lockDist(p1, p2, distance) {
     let vec = p2.subtract(p1);
@@ -130,11 +130,10 @@ var other = {
     var vec2 = p3.subtract(p2);
     let currAngCos = vec1.normalise().dotProduct(vec2.normalise());
     let currAngSin = vec1.normalise().crossProduct(vec2.normalise());
-    let newVec = new Point(currAngCos, currAngSin);
-    if (critAngle < currAngCos) {
-      newVec = Point.lerp(newVec, new Point(1, 0), this.sl(t, currAngSin, currAngCos));
+    let angleVec = new Point(currAngCos, currAngSin);
+    if (critAngle > currAngCos) {
+      vec2 = Point.lerp(vec2, vec1, this.sl(t, currAngSin, currAngCos)).normalise().scale(vec1.length());
     }
-    vec2 = newVec.geoProduct(vec1.normalise()).scale(vec2.length());
     return p2.add(vec2);
   },
   toBSpace(point, offset, rotator) {
@@ -175,6 +174,7 @@ class Lizard {
     };
   }
 }
+var spineAmount = 6;
 var lizardCharacters = {
   lineLength: 50,
   limbLength: 40,
@@ -204,7 +204,7 @@ var lizardCharacters = {
       clockwise: false
     }
   ],
-  myCharacter: new Lizard(crypto.randomUUID(), Array(6).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), [new Point(-5, -60), new Point(5, 60), new Point(-5, 50), new Point(5, 50)], [
+  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), [
     { index: 5, offset: new Point(0, 4) },
     { index: 4, offset: new Point(0, 7) },
     { index: 3, offset: new Point(0, 10) },
@@ -230,16 +230,26 @@ var lizardCharacters = {
       lizard.vel.velocitySpine[i] = newSpine[i].subtract(lizard.spine[i]).scale(1 / deltaT.deltaTime);
     }
     this.myCharacter.spine = newSpine;
-    console.table(newSpine);
     return newSpine;
+  },
+  toBodySpace(index, point) {
+    let bodyPoint = this.myCharacter.spine[index];
+    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
+    return other.toBSpace(point, bodyPoint, secant.normalise());
+  },
+  fromBodySpace(index, point) {
+    let bodyPoint = this.myCharacter.spine[index];
+    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
+    return other.fromBSpace(point, bodyPoint, secant.normalise());
   },
   updateArms(lizard, states) {
     let newArms = lizard.arms;
     for (var i = 0;i < 4; i++) {
-      if (newArms[i].subtract(this.limbDefs[i].baseOffset).length() >= this.limbLength * 2) {
-        newArms[i] = other.lockDist(this.limbDefs[i].baseOffset, newArms[i], this.limbLength * 2);
+      if (newArms[i].subtract(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset)).length() >= this.limbLength * 2) {
+        newArms[i] = other.lockDist(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset), newArms[i], this.limbLength * 2);
       }
     }
+    this.myCharacter.arms = newArms;
     return newArms;
   },
   draw(lizard, ctx) {
@@ -248,8 +258,18 @@ var lizardCharacters = {
     for (var i = 1;i < lizard.spine.length; i++) {
       ctx.lineTo(lizard.spine[i].x, lizard.spine[i].y);
     }
-    ctx.closePath();
     ctx.stroke();
+    ctx.lineStyle(2, 16711935, 1);
+    for (var i = 0;i < 4; i++) {
+      let limbDef = this.limbDefs[i];
+      let base = this.fromBodySpace(limbDef.index, limbDef.baseOffset);
+      let hand = lizard.arms[i];
+      let joint = other.inverseKinematics(base, hand, limbDef.clockwise, this.limbLength);
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(joint.x, joint.y);
+      ctx.lineTo(hand.x, hand.y);
+      ctx.stroke();
+    }
   }
 };
 var lizard_default = { lizardCharacters, Lizard };

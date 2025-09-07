@@ -23,6 +23,7 @@ export class Lizard {
     };
   }
 }
+var spineAmount = 6;
 export type armMotions = "walk" | "return";
 export var lizardCharacters = {
   lineLength: 50,
@@ -66,10 +67,12 @@ export var lizardCharacters = {
   }[],
   myCharacter: new Lizard(
     crypto.randomUUID(),
-    Array(6)
+    Array(spineAmount)
       .fill(0)
       .map(() => new Point(Math.random() + 100, Math.random() + 100)),
-    [new Point(-5, -60), new Point(5, 60), new Point(-5, 50), new Point(5, 50)],
+    Array(4)
+      .fill(0)
+      .map(() => new Point(Math.random() + 100, Math.random() + 100)),
     [
       { index: 5, offset: new Point(0, 4) },
       { index: 4, offset: new Point(0, 7) },
@@ -124,9 +127,24 @@ export var lizardCharacters = {
         .scale(1 / deltaT.deltaTime);
     }
     this.myCharacter.spine = newSpine;
-    console.table(newSpine);
+    // console.table(newSpine);
     return newSpine;
   },
+  toBodySpace(index: number, point: Point) {
+    let bodyPoint: Point = this.myCharacter.spine[index];
+    let secant: Point = this.myCharacter.spine[
+      index == spineAmount - 1 ? index : index + 1
+    ].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
+    return other.toBSpace(point, bodyPoint, secant.normalise());
+  },
+  fromBodySpace(index: number, point: Point) {
+    let bodyPoint: Point = this.myCharacter.spine[index];
+    let secant: Point = this.myCharacter.spine[
+      index == spineAmount - 1 ? index : index + 1
+    ].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
+    return other.fromBSpace(point, bodyPoint, secant.normalise());
+  },
+  // Update arms based on states
   updateArms(
     lizard: Lizard,
     states: armMotions[],
@@ -140,16 +158,27 @@ export var lizardCharacters = {
     for (var i = 0; i < 4; i++) {
       // enforce arm length
       if (
-        newArms[i].subtract(this.limbDefs[i].baseOffset).length() >=
+        newArms[i]
+          .subtract(
+            this.fromBodySpace(
+              this.limbDefs[i].index,
+              this.limbDefs[i].baseOffset,
+            ),
+          )
+          .length() >=
         this.limbLength * 2
       ) {
         newArms[i] = other.lockDist(
-          this.limbDefs[i].baseOffset,
+          this.fromBodySpace(
+            this.limbDefs[i].index,
+            this.limbDefs[i].baseOffset,
+          ),
           newArms[i],
           this.limbLength * 2,
         );
       }
     }
+    this.myCharacter.arms = newArms;
     return newArms;
   },
   draw(lizard: Lizard, ctx: any) {
@@ -158,8 +187,25 @@ export var lizardCharacters = {
     for (var i = 1; i < lizard.spine.length; i++) {
       ctx.lineTo(lizard.spine[i].x, lizard.spine[i].y);
     }
-    ctx.closePath();
+    // ctx.closePath();
     ctx.stroke();
+    // draw limbs
+    ctx.lineStyle(2, 0xff00ff, 1);
+    for (var i = 0; i < 4; i++) {
+      let limbDef = this.limbDefs[i];
+      let base = this.fromBodySpace(limbDef.index, limbDef.baseOffset);
+      let hand = lizard.arms[i];
+      let joint = other.inverseKinematics(
+        base,
+        hand,
+        limbDef.clockwise,
+        this.limbLength,
+      );
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(joint.x, joint.y);
+      ctx.lineTo(hand.x, hand.y);
+      ctx.stroke();
+    }
   },
 };
 export default { lizardCharacters, Lizard };
