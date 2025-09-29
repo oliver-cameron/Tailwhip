@@ -1,3 +1,135 @@
+var __create = Object.create;
+var __getProtoOf = Object.getPrototypeOf;
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __toESM = (mod, isNodeMode, target) => {
+  target = mod != null ? __create(__getProtoOf(mod)) : {};
+  const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
+  for (let key of __getOwnPropNames(mod))
+    if (!__hasOwnProp.call(to, key))
+      __defProp(to, key, {
+        get: () => mod[key],
+        enumerable: true
+      });
+  return to;
+};
+var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+
+// scriptsDev/newSpine.tsx
+var require_newSpine = __commonJS(() => {
+  function multiplyMatrices(lhs, rhs) {
+    let lhsHeight = lhs[0].length;
+    for (var i = 0;i < lhs.length; i++) {
+      if (lhs[i].length != lhsHeight) {
+        throw new Error("LHS is not a valid matrix");
+      }
+    }
+    let rhsHeight = rhs[0].length;
+    for (var i = 0;i < rhs.length; i++) {
+      if (rhs[i].length != rhsHeight) {
+        throw new Error("RHS is not a valid matrix");
+      }
+    }
+    if (lhsHeight != rhs.length) {
+      throw new Error("Matrix dimensions do not match");
+    }
+    let returner = Array.from({ length: lhs.length }, () => Array(rhs[0].length).fill(0));
+    for (var i = 0;i < lhs.length; i++) {
+      for (var j = 0;j < rhs[0].length; j++) {
+        let sum = 0;
+        for (var k = 0;k < lhsHeight; k++) {
+          sum += lhs[i][k] * rhs[k][j];
+        }
+        returner[i][j] = sum;
+      }
+    }
+    return returner;
+  }
+  function LUDecompose(Matrix) {
+    let n = Matrix.length;
+    let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i) => row.map((val, j) => i === j ? 1 : 0));
+    let U = multiplyMatrices(L, Matrix);
+    console.log(U);
+    console.log(L);
+    for (let i = 0;i < n; i++) {
+      for (let j = i + 1;j < n; j++) {
+        let div = U[j][i] / U[i][i];
+        L[j][i] = div;
+        for (let k = i;k < n; k++) {
+          U[j][k] -= div * U[i][k];
+        }
+        console.table(U);
+        console.table(L);
+      }
+    }
+    return { L, U };
+  }
+  function factorial(n) {
+    if (n % 1 !== 0) {
+      Error("Fractional factorial not implemented");
+    }
+    if (n < 0) {
+      Error("Negative factorial not defined");
+    } else if (n === 0 || n === 1) {
+      return 1;
+    } else {
+      return n * factorial(n - 1);
+    }
+  }
+  function matrixAddition(lhs, rhs) {
+    return lhs.map((row, i) => row.map((val, j) => val + rhs[i][j]));
+  }
+  function padeApproximation(Matrix, order) {
+    let size = Matrix.length;
+    for (var i = 0;i < size; i++) {
+      if (Matrix[i].length != size) {
+        throw new Error("Matrix is not square");
+      }
+    }
+    let absMat = Matrix.map((row) => row.map((x2) => Math.abs(x2)).reduce((a, b) => a + b)).reduce((a, b) => a > b ? a : b);
+    let scalar = absMat > 1 ? Math.ceil(Math.log2(absMat)) : 1;
+    let deltaMat = Matrix.map((row) => row.map((x2) => x2 / 2 ** scalar));
+    let powerCache = [deltaMat];
+    let coefficients = [];
+    for (let i2 = 1;i2 <= order; i2++) {
+      powerCache.push(multiplyMatrices(powerCache[i2 - 1], deltaMat));
+      coefficients.push(factorial(order * 2 - i2) * factorial(order) / (factorial(order * 2) * factorial(i2) * factorial(order - i2)));
+    }
+    let numerator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index]))).reduce((a, b) => matrixAddition(a, b));
+    let denominator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index] * (index % 2 === 0 ? 1 : -1)))).reduce((a, b) => matrixAddition(a, b));
+    let { L, U } = LUDecompose(denominator);
+    let x = Array.from({ length: size }, () => Array(size).fill(0));
+    for (var v = 0;v < size; v++) {
+      let y = Array(size).fill(0);
+      for (var i = 0;i < size; i++) {
+        let sum = numerator[i][v];
+        if (i !== 0) {
+          for (var j = 0;j < i - 1; j++) {
+            sum -= L[i][j] * y[j];
+          }
+          y[i] /= L[i][i];
+        }
+      }
+      for (var i = size - 1;i >= 0; i--) {
+        let sum = y[i];
+        for (var j = i + 1;j < size; j++) {
+          sum -= U[i][j] * x[j][v];
+        }
+        x[i][v] = sum / U[i][i];
+      }
+    }
+    for (var i = 0;i < scalar; i++) {
+      x = multiplyMatrices(x, x);
+    }
+    return x;
+  }
+  console.log(padeApproximation([
+    [9, 2],
+    [7, 1]
+  ], 5));
+});
+
 // scriptsDev/geo.tsx
 class Point {
   x;
@@ -155,145 +287,42 @@ var other = {
 };
 var geo_default = { Point, Curve, other };
 
-// scriptsDev/lizard.tsx
-class Lizard {
-  id;
-  spine;
-  vel;
-  arms;
-  bodyShape;
-  spineLength = 6;
-  constructor(id, spine, arms, bodyShape) {
-    this.id = id;
-    this.spine = spine;
-    this.arms = arms;
-    this.bodyShape = bodyShape;
-    this.vel = {
-      oldPoints: spine,
-      velocitySpine: Array(spine.length).fill(Point.zero)
-    };
-  }
-}
-var spineAmount = 6;
-var lizardCharacters = {
-  lineLength: 50,
-  limbLength: 40,
-  limbDefs: [
-    {
-      index: 1,
-      baseOffset: new Point(0, -15),
-      handOffset: new Point(-5, -60),
-      clockwise: false
-    },
-    {
-      index: 1,
-      baseOffset: new Point(0, 15),
-      handOffset: new Point(5, 60),
-      clockwise: true
-    },
-    {
-      index: 3,
-      baseOffset: new Point(0, -5),
-      handOffset: new Point(-5, -50),
-      clockwise: true
-    },
-    {
-      index: 3,
-      baseOffset: new Point(0, 5),
-      handOffset: new Point(5, 50),
-      clockwise: false
-    }
-  ],
-  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), [
-    { index: 5, offset: new Point(0, 4) },
-    { index: 4, offset: new Point(0, 7) },
-    { index: 3, offset: new Point(0, 10) },
-    { index: 2, offset: new Point(-15, 20) },
-    { index: 1, offset: new Point(0, 16) },
-    { index: 0, offset: new Point(0, 20) },
-    { index: 0, offset: new Point(20, 10) }
-  ]),
-  others: {},
-  updateSpine(lizard, direction, origin, deltaT) {
-    let newSpine = lizard.spine;
-    newSpine[0] = newSpine[0].add(direction.scale(deltaT.deltaTime) ?? Point.zero);
-    for (var i = 1;i < newSpine.length; i++) {
-      newSpine[i] = newSpine[i].add(lizard.vel.velocitySpine[i].scale(deltaT.deltaTime).scale(0.9));
-    }
-    for (var i = 2;i < newSpine.length; i++) {
-      newSpine[i] = other.spring(newSpine[i - 2], newSpine[i - 1], newSpine[i], 0.5, 0.1, deltaT.deltaTime);
-    }
-    for (var i = 1;i < newSpine.length; i++) {
-      newSpine[i] = other.lockDist(newSpine[i - 1], newSpine[i], this.lineLength);
-    }
-    for (var i = 0;i < newSpine.length; i++) {
-      lizard.vel.velocitySpine[i] = newSpine[i].subtract(lizard.spine[i]).scale(1 / deltaT.deltaTime);
-    }
-    this.myCharacter.spine = newSpine;
-    return newSpine;
-  },
-  toBodySpace(index, point) {
-    let bodyPoint = this.myCharacter.spine[index];
-    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
-    return other.toBSpace(point, bodyPoint, secant.normalise());
-  },
-  fromBodySpace(index, point) {
-    let bodyPoint = this.myCharacter.spine[index];
-    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
-    return other.fromBSpace(point, bodyPoint, secant.normalise());
-  },
-  updateArms(lizard, states) {
-    let newArms = lizard.arms;
-    for (var i = 0;i < 4; i++) {
-      if (newArms[i].subtract(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset)).length() >= this.limbLength * 2) {
-        newArms[i] = other.lockDist(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset), newArms[i], this.limbLength * 2);
-      }
-    }
-    this.myCharacter.arms = newArms;
-    return newArms;
-  },
-  draw(lizard, ctx) {
-    ctx.lineStyle(4, 65536, 1);
-    ctx.moveTo(lizard.spine[0].x, lizard.spine[0].y);
-    for (var i = 1;i < lizard.spine.length; i++) {
-      ctx.lineTo(lizard.spine[i].x, lizard.spine[i].y);
-    }
-    ctx.stroke();
-    ctx.lineStyle(2, 16711935, 1);
-    for (var i = 0;i < 4; i++) {
-      let limbDef = this.limbDefs[i];
-      let base = this.fromBodySpace(limbDef.index, limbDef.baseOffset);
-      let hand = lizard.arms[i];
-      let joint = other.inverseKinematics(base, hand, limbDef.clockwise, this.limbLength);
-      ctx.moveTo(base.x, base.y);
-      ctx.lineTo(joint.x, joint.y);
-      ctx.lineTo(hand.x, hand.y);
-      ctx.stroke();
-    }
-  }
-};
-var lizard_default = { lizardCharacters, Lizard };
-
 // scriptsDev/render.tsx
+var import_newSpine = __toESM(require_newSpine(), 1);
 var app = new PIXI.Application;
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
 console.log(app);
 document.getElementById("graphics").appendChild(app.canvas);
 var gfx = new PIXI.Graphics;
+var testSpine = new import_newSpine.Spine(Array(10).fill(Point.zero).map((o) => o.add(new Point(100 + Math.random(), 100 + Math.random()))));
+var keyboard = {};
+window.addEventListener("keydown", (e) => {
+  keyboard[e.key] = true;
+});
+window.addEventListener("keyup", (e) => {
+  keyboard[e.key] = false;
+});
 app.stage.addChild(gfx);
 app.ticker.add((delta) => {
+  let headForce = Point.zero;
+  if (keyboard["w"]) {
+    headForce = headForce.add(new Point(0, -500));
+  }
+  if (keyboard["a"]) {
+    headForce = headForce.add(new Point(-500, 0));
+  }
+  if (keyboard["s"]) {
+    headForce = headForce.add(new Point(0, 500));
+  }
+  if (keyboard["d"]) {
+    headForce = headForce.add(new Point(500, 0));
+  }
   gfx.clear();
-  lizardCharacters.draw(lizardCharacters.myCharacter, gfx);
-  lizardCharacters.updateSpine(lizardCharacters.myCharacter, new Point(1, Math.sin(Date.now() / 200) * 0.5), 0, delta);
-  lizardCharacters.updateArms(lizardCharacters.myCharacter, [
-    "walk",
-    "walk",
-    "walk",
-    "walk"
-  ]);
-  gfx.lineStyle(1, 16, 1);
-  gfx.moveTo(0, 0);
-  gfx.lineTo(100, 100);
-  gfx.closePath();
+  testSpine = import_newSpine.updateSpine(testSpine, headForce, delta.deltaTime);
+  gfx.lineStyle(4, 1, 1);
+  gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
+  for (let i = 1;i < testSpine.points.length; i++) {
+    gfx.lineTo(testSpine.points[i].x, testSpine.points[i].y);
+  }
   gfx.stroke();
 });
