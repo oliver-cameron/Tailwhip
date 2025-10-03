@@ -9,9 +9,15 @@ document.getElementById("graphics").appendChild(app.canvas);
 // })();
 let gfx = new PIXI.Graphics();
 let testSpine = new Spine(
-  Array(10)
-    .fill(Point.zero)
-    .map((o) => o.add(new Point(100 + Math.random(), 100 + Math.random()))),
+  // Array(4)
+  //   .fill(Point.zero)
+  //   .map((o) => o.add(new Point(300 + Math.random(), 300 + Math.random()))),
+  [
+    new Point(200, 200),
+    new Point(200, 260),
+    new Point(260, 260),
+    new Point(260, 200),
+  ],
 );
 let keyboard = {};
 window.addEventListener("keydown", (e) => {
@@ -37,8 +43,9 @@ app.ticker.add((delta) => {
   }
   // console.log(headForce);
   // Update spine
-  gfx.clear();
+
   testSpine = updateSpine(testSpine, headForce, delta.deltaTime);
+  gfx.clear();
   gfx.lineStyle(4, 0x000001, 1);
   gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
   for (let i = 1; i < testSpine.points.length; i++) {

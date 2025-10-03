@@ -1,53 +1,30 @@
-// import { Point, Curve } from "./geo";
-// export class Spine {
-//   points: Point[];
-//   velocity: Point[];
-//   constructor(points: Point[]) {
-//     this.points = points;
-//     this.velocity = Array(points.length).fill(Point.zero);
-//   }
-// }
+import { Point, Curve } from "./geo";
+export class Spine {
+  points: Point[];
+  velocity: Point[];
+  constructor(points: Point[]) {
+    this.points = points;
+    this.velocity = Array(points.length).fill(Point.zero);
+  }
+}
 // let stiffness = 1;
 // let segmentLength = 20;
 // let inertia = 0.6;
 // let mass = 50;
-// export function updateSpine(
-//   spine: Spine,
-//   headforce: Point,
-//   deltaTime: number,
-// ): Spine {
-//   let newSpine = spine;
-//   // Calculate interior forces
-//   let pointAmount = spine.points.length;
-//   let differences: Point[] = Array(pointAmount - 1)
-//     .fill(Point.zero)
-//     .map((element: Point, index: number) =>
-//       spine.points[index].subtract(spine.points[index + 1]),
-//     );
-//   let springForces: Point[] = differences.map((diff: Point) =>
-//     diff.scale(stiffness * (diff.length() - segmentLength)),
-//   );
-//   let forces: Point[] = Array(pointAmount)
-//     .fill(Point.zero)
-//     .map((element: Point, index: number) =>
-//       (index == pointAmount - 1 ? Point.zero : springForces[index])
-//         .subtract(index == 0 ? Point.zero : springForces[index - 1])
-//         .scale(-1),
-//     );
-//   let newVel = spine.velocity.map((vel: Point, index: number) =>
-//     vel.scale(inertia).add(forces[index].scale(deltaTime / mass)),
-//   );
-//   newVel[0] = newVel[0].add(headforce.scale(deltaTime / mass));
-//   // Update positions
-//   let newPoints = spine.points.map((point: Point, index: number) =>
-//     point.add(newVel[index].scale(deltaTime)),
-//   );
-//   newSpine.points = newPoints;
-//   newSpine.velocity = newVel;
-//   return newSpine;
-// }
-
-import { multiplyColors } from "pixi.js";
+export function updateSpine(
+  spine: Spine,
+  headforce: Point,
+  deltaTime: number,
+): Spine {
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime);
+  spine.points = update.spinePosition;
+  spine.velocity = update.spineVel;
+  let avgVel = spine.velocity
+    .reduce((a, b) => a.add(b))
+    .scale(1 / spine.points.length);
+  // spine.points = spine.points.map((o) => o.subtract(avgVel));
+  return spine;
+}
 
 function multiplyMatrices(lhs: number[][], rhs: number[][]): number[][] {
   // A row is an array of numbers
@@ -157,6 +134,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
       ),
     )
     .reduce((a, b) => matrixAddition(a, b));
+
   // console.log("Denominator", denominator);
   // LU decomposition of denominator
   let { L, U } = LUDecompose(denominator);
@@ -177,7 +155,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
       }
       y[i] = sum / L[i][i];
     }
-    console.log("Y", y);
+    // console.log("Y", y);
     // Backward substitution
     for (var i = size - 1; i >= 0; i--) {
       let sum = y[i];
@@ -194,12 +172,219 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
   }
   return x;
 }
-console.log(
+console.table(
   padeApproximation(
     [
       [1, 2],
-      [0, -1],
+      [-1, -3],
     ],
     5,
   ),
 );
+// console.table(
+//   krylovApproximation(
+//     [
+//       [1, 2],
+//       [-1, 3],
+//     ],
+//     [1, 0],
+//     5,
+//     1,
+//   ),
+// );
+function krylovApproximation(
+  matrix: number[][],
+  start: number[],
+  order: number,
+  delta: number,
+): number[] {
+  let n = matrix.length;
+  let B = matrix.map((row) => row.map((val) => val * delta));
+  let m = order;
+  let Q: number[][] = Array.from({ length: m + 1 }, () => Array(n).fill(0));
+  console.log(Q);
+  let startNorm = Math.sqrt(start.reduce((a, b) => a + b * b, 0));
+  let q0 = start.map((val) => val / startNorm);
+  for (var i = 0; i < n; i++) {
+    Q[i][0] = q0[i];
+  }
+  let H: number[][] = Array.from({ length: m + 1 }, () => Array(m).fill(0));
+  let { Q: finalQ, H: finalH } = KAIteration(m, B, Q, H);
+  // console.log("Final Q", finalQ);
+  // console.log("Final H", finalH);
+  let expH = padeApproximation(
+    finalH.slice(0, m).map((row) => row.slice(0, m)),
+    6,
+  );
+  let result = multiplyMatrices(
+    finalQ.map((row) => row.slice(0, m)),
+    expH,
+  )[0].map((val) => val * startNorm);
+  return result;
+}
+function KAIteration(
+  // M: iteration number
+  // B is square matrix. Q is result matrix, with same height, and width = m + 1.
+  // H is hessianberg matrix to fill in, which is which height is m+1, and width is m
+  M: number,
+  B: number[][],
+  Q: number[][],
+  H: number[][],
+): { Q: number[][]; H: number[][] } {
+  // Check dimensions
+  let n = B.length;
+  {
+    if (Q[0].length != n || Q.length != M + 1) {
+      throw new Error("Q has wrong dimensions");
+    }
+    for (var i = 0; i < n; i++) {
+      if (B[i].length != n) {
+        throw new Error("B is not square");
+      }
+      if (Q[i].length != n) {
+        throw new Error("Q is not a matrix");
+      }
+    }
+    for (var i = 0; i <= M; i++) {
+      if (H[i].length != M) {
+        throw new Error("H has wrong dimensions");
+      }
+    }
+  }
+  // Begin iteration
+  for (var k = 1; k <= M; k++) {
+    // 1. Compute the k-th column of Q
+    let qk = multiplyMatrices(B, [Q.map((row) => row[k - 1])])[0];
+    for (var j = 0; j < k; j++) {
+      let dot = 0;
+      for (var i = 0; i < n; i++) {
+        dot += qk[i] * Q[i][j];
+      }
+      H[j][k - 1] = dot;
+      for (var i = 0; i < n; i++) {
+        qk[i] -= dot * Q[i][j];
+      }
+    }
+    let norm = Math.sqrt(qk.reduce((a, b) => a + b * b, 0));
+    if (norm < 1e-10) {
+      console.warn("Matrix has deficient rank");
+    }
+    qk = qk.map((val) => val / norm);
+    for (var i = 0; i < n; i++) {
+      Q[i][k] = qk[i];
+    }
+    H[k - 1][k - 1] = norm;
+  }
+  return { Q, H };
+}
+let targetLength = 20;
+let springForces: {
+  coefficients: number[];
+  targetLength: number;
+  stiffness: number;
+}[] = [
+  {
+    coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
+    targetLength: (targetLength * 10) / 27,
+    stiffness: 1,
+  },
+  {
+    coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
+    targetLength: (targetLength * 7) / 27,
+    stiffness: 1,
+  },
+  {
+    coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
+    targetLength: (targetLength * 10) / 27,
+    stiffness: 1,
+  },
+];
+function padeNextFrame(
+  spinePosition: Point[],
+  spineVel: Point[],
+  delta: number,
+): { spinePosition: Point[]; spineVel: Point[] } {
+  // Calculate matrix
+  // Vector values are p1x, p2x, p3x, ..., p1y, p2y, p3y, ... v1x, v2x, v3x, ..., v1y, v2y, v3y, ..., 1
+  // > 1. Construct blocks for dynamic force matrix (nxn), f and static force vector (nx1), v
+  let n = spinePosition.length;
+  let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
+  let V = new Array(2 * n).fill(0).map(() => 0);
+  for (var i = -1; i < n - 2; i++) {
+    let indecies = [i, i + 1, i + 2, i + 3];
+    if (i == -1) {
+      indecies = [0, 1, 2];
+    }
+    if (i == n - 3) {
+      indecies = [n - 3, n - 2, n - 1];
+    }
+    for (var j = 0; j < 3; j++) {
+      let coeffs = springForces[j].coefficients;
+      let targetLength = springForces[j].targetLength;
+      let stiffness = springForces[j].stiffness;
+      if (i == -1) {
+        coeffs[1] += coeffs[0];
+        coeffs[2] -= coeffs[0] * 2;
+        coeffs = coeffs.slice(1);
+      }
+      if (i == n - 3) {
+        coeffs[1] -= coeffs[3] * 2;
+        coeffs[2] += coeffs[3];
+        coeffs = coeffs.slice(0, 3);
+      }
+      let S: Point = indecies
+        .map((o, index) => spinePosition[o].scale(coeffs[index]))
+        .reduce((a, b) => a.add(b));
+      let sLen = Math.hypot(S.x, S.y);
+      let sLenNeg3 = Math.pow(sLen, -3);
+      for (var k = 0; k < indecies.length; k++) {
+        for (var a1 = 0; a1 < 2; a1++) {
+          let t1 = 2 * (a1 == 0 ? S.x : S.y) * coeffs[k] * stiffness;
+          V[indecies[k] + n * a1] += t1 * (targetLength - sLen);
+          for (var l = 0; l < indecies.length; l++) {
+            let lm = coeffs[l] * targetLength * sLenNeg3 * t1;
+            // F[indecies[k] + n * a1][indecies[l]] += S.x * lm;
+            for (var a2 = 0; a2 < 2; a2++) {
+              F[indecies[k] + n * a1][indecies[l] + n * a2] +=
+                (a2 == 0 ? S.x : S.y) * lm;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Step 2: Construct matrix from sub-blocks
+  let identityMatrix: number[][] = Array.from({ length: 2 * n }, () =>
+    Array(2 * n).fill(0),
+  ).map((row, i) => row.map((val, j) => (i === j ? 1 : 0)));
+  let builtMatrix: number[][] = [[]];
+  let zeroN: number[] = Array.from({ length: 2 * n }, () => 0);
+  for (var i = 0; i < 2 * n; i++) {
+    builtMatrix.push(zeroN.concat(identityMatrix[i]).concat([0]));
+  }
+  for (var i = 0; i < 2 * n; i++) {
+    builtMatrix.push(F[i].concat(zeroN).concat(V[i]));
+  }
+  builtMatrix.push(zeroN.concat(zeroN).concat(0));
+  builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));
+  console.clear();
+  console.table(V);
+  let a0 = spinePosition
+    .map((o) => o.x)
+    .concat(spinePosition.map((o) => o.y))
+    .concat(spineVel.map((o) => o.x))
+    .concat(spineVel.map((o) => o.y))
+    .concat([0])
+    .map((o) => [o]);
+  // Perform estimates for matrix exponentiation
+  let newMatrix = padeApproximation(builtMatrix, 5);
+  let answer = multiplyMatrices(newMatrix, a0).map((o) => o[0]);
+  var pos = [];
+  var vel = [];
+  for (var i = 0; i < n; i++) {
+    pos.push(new Point(answer[i], answer[i + n]));
+    vel.push(new Point(answer[i + 2 * n], answer[i + 2 * n]));
+  }
+  return { spinePosition: pos, spineVel: vel };
+}

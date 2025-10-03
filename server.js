@@ -16,18 +16,18 @@ Bun.serve({
         return new Response(Bun.file("./index.html"));
       case "/index.css":
         return new Response(Bun.file("./index.css"));
-      case "/lizard.js":
-        return new Response(Bun.file("./scriptsProd/lizard.js"), {
-          headers: { "Content-Type": "application/javascript" },
-        });
-      case "/pixi.min.js":
-        return new Response(Bun.file("./pixi.min.js"));
-      case "/new.html":
-        return new Response(Bun.file("./new.html"));
-      case "/scriptsProd/geo.tsx":
-        return new Response(Bun.file("./scriptsProd/geo.js"), {
-          headers: { "Content-Type": "application/javascript" },
-        });
+      // case "/lizard.js":
+      //   return new Response(Bun.file("./scriptsProd/lizard.js"), {
+      //     headers: { "Content-Type": "application/javascript" },
+      //   });
+      // case "/pixi.min.js":
+      //   return new Response(Bun.file("./pixi.min.js"));
+      // case "/new.html":
+      //   return new Response(Bun.file("./new.html"));
+      // case "/scriptsProd/geo.tsx":
+      //   return new Response(Bun.file("./scriptsProd/geo.js"), {
+      //     headers: { "Content-Type": "application/javascript" },
+      //   });
       default:
         return new Response("404 Not Found", { status: 404 });
     }
@@ -49,9 +49,9 @@ Bun.serve({
     "/lizard.js": new Response(Bun.file("./scriptsProd/lizard.js"), {
       headers: { "Content-Type": "application/javascript" },
     }),
-    "/newSpine.tsx": new Response(Bun.file("./scriptsDev/newSpine.tsx"), {
-      headers: { "Content-Type": "application/javascript" },
-    }),
+    // "/newSpine.tsx": new Response(Bun.file("./scriptsDev/newSpine.tsx"), {
+    //   headers: { "Content-Type": "application/javascript" },
+    // }),
   },
 });
 console.log("Server running on http://localhost:8000");
