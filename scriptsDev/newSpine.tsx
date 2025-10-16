@@ -16,7 +16,7 @@ export function updateSpine(
   headforce: Point,
   deltaTime: number,
 ): Spine {
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 200);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity
@@ -349,6 +349,8 @@ function padeNextFrame(
                 (a2 == 0 ? S.x : S.y) * lm;
             }
           }
+          let sum = F[indecies[k] + n * a1].reduce((a, b) => a + b);
+          V[indecies[k] + n * a1] -= sum;
         }
       }
     }
@@ -375,7 +377,7 @@ function padeNextFrame(
     .concat(spinePosition.map((o) => o.y))
     .concat(spineVel.map((o) => o.x))
     .concat(spineVel.map((o) => o.y))
-    .concat([0])
+    .concat([1])
     .map((o) => [o]);
   // Perform estimates for matrix exponentiation
   let newMatrix = padeApproximation(builtMatrix, 5);

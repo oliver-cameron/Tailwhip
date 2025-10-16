@@ -49,9 +49,9 @@ Bun.serve({
     "/lizard.js": new Response(Bun.file("./scriptsProd/lizard.js"), {
       headers: { "Content-Type": "application/javascript" },
     }),
-    // "/newSpine.tsx": new Response(Bun.file("./scriptsDev/newSpine.tsx"), {
-    //   headers: { "Content-Type": "application/javascript" },
-    // }),
+    "/newSpine.tsx": new Response(Bun.file("./scriptsDev/newSpine.tsx"), {
+      headers: { "Content-Type": "application/javascript" },
+    }),
   },
 });
 console.log("Server running on http://localhost:8000");

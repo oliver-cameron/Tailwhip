@@ -165,7 +165,7 @@ class Spine {
   }
 }
 function updateSpine(spine, headforce, deltaTime) {
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 200);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity.reduce((a, b) => a.add(b)).scale(1 / spine.points.length);
@@ -337,6 +337,8 @@ function padeNextFrame(spinePosition, spineVel, delta) {
               F[indecies[k] + n * a1][indecies[l] + n * a2] += (a2 == 0 ? S.x : S.y) * lm;
             }
           }
+          let sum = F[indecies[k] + n * a1].reduce((a, b) => a + b);
+          V[indecies[k] + n * a1] -= sum;
         }
       }
     }
@@ -354,7 +356,7 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k2) => k2 * delta));
   console.clear();
   console.table(V);
-  let a0 = spinePosition.map((o) => o.x).concat(spinePosition.map((o) => o.y)).concat(spineVel.map((o) => o.x)).concat(spineVel.map((o) => o.y)).concat([0]).map((o) => [o]);
+  let a0 = spinePosition.map((o) => o.x).concat(spinePosition.map((o) => o.y)).concat(spineVel.map((o) => o.x)).concat(spineVel.map((o) => o.y)).concat([1]).map((o) => [o]);
   let newMatrix = padeApproximation(builtMatrix, 5);
   let answer = multiplyMatrices(newMatrix, a0).map((o) => o[0]);
   var pos = [];
