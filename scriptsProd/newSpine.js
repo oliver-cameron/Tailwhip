@@ -1,3 +1,5 @@
+var __commonJS = (cb, mod) => () => (mod || cb((mod = { exports: {} }).exports, mod), mod.exports);
+
 // scriptsDev/geo.tsx
 class Point {
   x;
