@@ -7,11 +7,11 @@ Inputs: $P_0$, $P_1$, $P_2$, $P_3$, $Q_0$, $Q_1$, $Q_2$, $Q_3 \in \mathbb{C}$
 
 Define cubic beziers:
 ```math
-P_c(t) = \begin{bmatrix}t^3&t^2&t&1\end{bmatrix}\begin{bmatrix}-1&3&-3&-1\\
+P_c(t) = \begin{bmatrix}t^3&t^2&t&1\end{bmatrix}\begin{bmatrix}-1&3&-3&1\\
 3&-6&3&0\\
 -3&3&0&0\\
 1&0&0&0\end{bmatrix}\begin{bmatrix}P_0\\P_1\\P_2\\P_3\end{bmatrix}\\\therefore
-P_c'(t) = \begin{bmatrix}t^2&t&1\end{bmatrix}\begin{bmatrix}-3&9&-9&-3\\
+P_c'(t) = \begin{bmatrix}t^2&t&1\end{bmatrix}\begin{bmatrix}-3&9&-9&3\\
 6&-12&6&0\\
 -3&3&0&0\\\end{bmatrix}\begin{bmatrix}P_0\\P_1\\P_2\\P_3\end{bmatrix}\\
 ```

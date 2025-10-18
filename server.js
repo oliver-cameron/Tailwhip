@@ -4,7 +4,7 @@ await Bun.build({
     "./scriptsDev/render.tsx",
     "./scriptsDev/lizard.tsx",
     "./scriptsDev/newSpine.tsx",
-    "./scriptsDev/newRender.tsx"
+    "./scriptsDev/newRender.tsx",
   ],
   target: "browser",
   outdir: "./scriptsProd",

@@ -280,7 +280,7 @@ function padeApproximation(Matrix, order) {
 }
 console.table(padeApproximation([
   [1, 2],
-  [-1, -3]
+  [0, -1]
 ], 5));
 var targetLength = 20;
 var springForces = [
@@ -356,8 +356,6 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k2) => k2 * delta));
-  console.clear();
-  console.table(V);
   let a0 = spinePosition.map((o) => o.x).concat(spinePosition.map((o) => o.y)).concat(spineVel.map((o) => o.x)).concat(spineVel.map((o) => o.y)).concat([1]).map((o) => [o]);
   let newMatrix = padeApproximation(builtMatrix, 5);
   let answer = multiplyMatrices(newMatrix, a0).map((o) => o[0]);

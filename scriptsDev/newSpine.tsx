@@ -176,7 +176,7 @@ console.table(
   padeApproximation(
     [
       [1, 2],
-      [-1, -3],
+      [0, -1],
     ],
     5,
   ),
@@ -370,8 +370,8 @@ function padeNextFrame(
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));
-  console.clear();
-  console.table(V);
+  // console.clear();
+  // console.table(V);
   let a0 = spinePosition
     .map((o) => o.x)
     .concat(spinePosition.map((o) => o.y))
