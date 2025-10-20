@@ -9,10 +9,13 @@ margin: 0;
 overflow: hidden; /* No scrolling */
 
 }
-button {
+.button {
 padding: 20px 100px;
 cursor: pointer;
 font-size: 24px;
-font-family: comic sans-serif;
-} 
+font-family: comic sans ms, sans-serif;
+color: green;
+}
+
+
 
