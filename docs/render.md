@@ -26,8 +26,31 @@ which I will kindly simplify slightly (to make simpler, not to expand)
 ```math
 F_1(x)=4af^2x^3-24ax+3b\left(f^2x^2-2\right)+2cf^2x+df^2-f^2o\\
 F_2(x)=-8af^{4}x^{4}+96af^{2}x^{2}-192a-8bf^{4}x^{3}+48bf^{2}x-8cf^{4}x^{2}+16cf^{2}-8df^{4}x+8f^{4}ox\\
-\frac{\partial E}{\partial f} = \frac{A\left(-8fcos\left(fx+p\right)F_1(x)+Af^3\left(-2fxcos\left(2\left(fx+p\right)\right)+sin\left(2\left(fx+p\right)\right)+sin\left(fx+p\right)\right)F_2(x)\right)}{4f^5}
+\frac{\partial E}{\partial f} = \frac{A\left(-8fcos\left(fx+p\right)F_1(x)+Af^3\left(-2fxcos\left(2\left(fx+p\right)\right)+sin\left(2\left(fx+p\right)\right)\right)+sin\left(fx+p\right)F_2(x)\right)}{4f^5}
 ```
 which is still a monster, but you didn't bother to read the full other $\frac{\partial E}{\partial f}$, did you. So it's better
 
 Now, for the sake of everyone reading this, we will simplify these expressions, take only the values at $x=1$ and $x=0$, set them all to zero and combine.
+
+Vertex set of equations (solve for f, p, o and A)
+```math
+\frac{A\left(-8fcos\left(p\right)F_1(0)+Af^3sin\left(2p\right)+sin\left(p\right)F_2(0)\right)}{4f^5} = \frac{A\left(-8fcos\left(f+p\right)F_1(1)+Af^3\left(-2fcos\left(2\left(f+p\right)\right)+sin\left(2\left(f+p\right)\right)\right)+sin\left(f+p\right)F_2(1)\right)}{4f^5}\\
+\therefore
+-8fcos\left(p\right)\left(-6b+df^2-f^2o\right)+Af^3sin\left(2p\right)+sin\left(p\right)\left(-192a+16cf\right) = -8fcos\left(f+p\right)\left(4af^2-24a+3bf^2-6b+2cf+df^2-f^2o\right)+Af^3\left(-2fcos\left(2\left(f+p\right)\right)+sin\left(2\left(f+p\right)\right)\right)+sin\left(f+p\right)\left(-8f^4+96af^2-192a-8bf^4+48bf^2-8cf^4+16cf^2-8df^4
++8f^4o\right)\\
+```
+&
+```math
+-\frac{A (4 f sin(p) (2 b +d f^2 - f^2 o) + 4 cos(p) (-6a + f^2c) + A f^3 cos(2p))}{2 f^4} = -\frac{A (4 f sin(f + p) (a f^2- 6 a + b f^2- 2 b + c f^2 + d f^2 - f^2 o) + 4 cos(f + p) (3 a (f^2- 2) + f^2 (2 b+ c)) + A f^3 cos(2 (f + p)))}{2 f^4}\\
+\therefore 4 f sin(p) (2 b +d f^2 - f^2 o) + 4 cos(p) (-6a + f^2c) + A f^3 cos(2p) = 4 f sin(f + p) (a f^2- 6 a + b f^2- 2 b + c f^2 + d f^2 - f^2 o) + 4 cos(f + p) (3 a (f^2- 2) + f^2 (2 b+ c)) + A f^3 cos(2 (f + p))
+```
+```math
+
+```
+Fragment equations (solve for $O$, $A$, $F$ and $P$):
+```math
+    O + Asin\left(P\right) = V_1\\
+    O + Asin\left(F + P\right) = V_2\\
+    AFcos\left(P\right) = D_1\\
+    AFcos\left(F+P\right) = D_2\\
+```
