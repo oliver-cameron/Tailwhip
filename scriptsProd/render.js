@@ -167,7 +167,8 @@ class Spine {
   }
 }
 function updateSpine(spine, headforce, deltaTime) {
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 200);
+  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime / 1000));
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity.reduce((a, b) => a.add(b)).scale(1 / spine.points.length);
@@ -340,7 +341,6 @@ function padeNextFrame(spinePosition, spineVel, delta) {
             }
           }
           let sum = F[indecies[k] + n * a1].reduce((a, b) => a + b);
-          V[indecies[k] + n * a1] -= sum;
         }
       }
     }
@@ -352,7 +352,7 @@ function padeNextFrame(spinePosition, spineVel, delta) {
     builtMatrix.push(zeroN.concat(identityMatrix[i]).concat([0]));
   }
   for (var i = 0;i < 2 * n; i++) {
-    builtMatrix.push(F[i].concat(zeroN).concat(V[i]));
+    builtMatrix.push(zeroN.concat(zeroN).concat(V[i]));
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k2) => k2 * delta));
@@ -363,7 +363,7 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   var vel = [];
   for (var i = 0;i < n; i++) {
     pos.push(new Point(answer[i], answer[i + n]));
-    vel.push(new Point(answer[i + 2 * n], answer[i + 2 * n]));
+    vel.push(new Point(answer[i + 2 * n], answer[i + 3 * n]));
   }
   return { spinePosition: pos, spineVel: vel };
 }

@@ -26,8 +26,10 @@ fn fs_nothing(fragData: vertexOutput) -> @location(0) vec4f {
 }
 `;
 const vertexData = new Float32Array([
-  -1, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, -0.5, -0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
+  -1, 0.5, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+-0.5, -0.5, 0.0, 1.0, 0.0, 1.0, 0.0,
   1.0, 0.5, -0.5, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+  
 ]);
 async function init() {
   if (!navigator.gpu) {
