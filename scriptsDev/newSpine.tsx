@@ -16,8 +16,8 @@ export function updateSpine(
   headforce: Point,
   deltaTime: number,
 ): Spine {
-  spine.velocity[0] = spine.velocity[0] .add(headforce.scale(deltaTime / 1000));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000);
+  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity
@@ -279,6 +279,27 @@ function KAIteration(
   return { Q, H };
 }
 let targetLength = 20;
+// let springForces: {
+//   coefficients: number[];
+//   targetLength: number;
+//   stiffness: number;
+// }[] = [
+//   {
+//     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
+//     targetLength: (targetLength * 10) / 27,
+//     stiffness: 0.05,
+//   },
+//   {
+//     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
+//     targetLength: (targetLength * 7) / 27,
+//     stiffness: 0.05,
+//   },
+//   {
+//     coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
+//     targetLength: (targetLength * 10) / 27,
+//     stiffness: 0.05,
+//   },
+// ];
 let springForces: {
   coefficients: number[];
   targetLength: number;
@@ -287,17 +308,17 @@ let springForces: {
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
     targetLength: (targetLength * 10) / 27,
-    stiffness: 1,
+    stiffness: 0,
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
     targetLength: (targetLength * 7) / 27,
-    stiffness: 1,
+    stiffness: 0,
   },
   {
-    coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
+    coefficients: [0, 1, -1, 0],
     targetLength: (targetLength * 10) / 27,
-    stiffness: 1,
+    stiffness: 0.05,
   },
 ];
 function padeNextFrame(
@@ -319,20 +340,22 @@ function padeNextFrame(
     if (i == n - 3) {
       indecies = [n - 3, n - 2, n - 1];
     }
-    for (var j = 0; j < 3; j++) {
+    for (var j = 0; j < springForces.length; j++) {
       let coeffs = springForces[j].coefficients;
       let targetLength = springForces[j].targetLength;
       let stiffness = springForces[j].stiffness;
-      if (i == -1) {
-        coeffs[1] += coeffs[0];
-        coeffs[2] -= coeffs[0] * 2;
-        coeffs = coeffs.slice(1);
-      }
-      if (i == n - 3) {
-        coeffs[1] -= coeffs[3] * 2;
-        coeffs[2] += coeffs[3];
-        coeffs = coeffs.slice(0, 3);
-      }
+      // if (i == -1) {
+      //   break;
+      //   coeffs[1] += coeffs[0];
+      //   coeffs[2] -= coeffs[0] * 2;
+      //   coeffs = coeffs.slice(1);
+      // }
+      // if (i == n - 3) {
+      //   break;
+      //   coeffs[1] -= coeffs[3] * 2;
+      //   coeffs[2] += coeffs[3];
+      //   coeffs = coeffs.slice(0, 3);
+      // }
       let S: Point = indecies
         .map((o, index) => spinePosition[o].scale(coeffs[index]))
         .reduce((a, b) => a.add(b));
@@ -341,22 +364,36 @@ function padeNextFrame(
       for (var k = 0; k < indecies.length; k++) {
         for (var a1 = 0; a1 < 2; a1++) {
           let t1 = 2 * (a1 == 0 ? S.x : S.y) * coeffs[k] * stiffness;
-          V[indecies[k] + n * a1] += t1 * (targetLength - sLen);
+          V[indecies[k] + n * a1] -= (t1 * (sLen - targetLength)) / sLen;
           for (var l = 0; l < indecies.length; l++) {
-            let lm = coeffs[l] * targetLength * sLenNeg3 * t1;
             // F[indecies[k] + n * a1][indecies[l]] += S.x * lm;
+            // This is completely incorrect. Don't listen to past Oliver. He is a bit silly. Use the stuff in your notebook.
             for (var a2 = 0; a2 < 2; a2++) {
-              F[indecies[k] + n * a1][indecies[l] + n * a2] +=
-                (a2 == 0 ? S.x : S.y) * lm;
+              let scsd = (a1 == 0 ? S.x : S.y) * (a2 == 0 ? S.x : S.y);
+              let lm = 2 * coeffs[l] * coeffs[k];
+              let Nf = F[indecies[k] + n * a1][indecies[l] + n * a2];
+              Nf -= (stiffness * scsd) / sLenNeg3;
+              if (a1 == a2) {
+                Nf -= 1 - stiffness / sLen;
+              }
+              F[indecies[k] + n * a1][indecies[l] + n * a2] =
+                Nf * coeffs[k] * coeffs[l];
             }
           }
-          let sum = F[indecies[k] + n * a1].reduce((a, b) => a + b);
-          // V[indecies[k] + n * a1] -= sum;
         }
       }
     }
   }
-
+  //Subroutine: Change last column of matrix to account for velocity
+  let shiftPos = spinePosition
+    .map((o) => [[[o.x]], [[o.y]]])
+    .reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
+  let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map(
+    (o) => o[0],
+  );
+  for (var i = 0; i < 2 * n; i++) {
+    V[i] -= acc[i];
+  }
   // Step 2: Construct matrix from sub-blocks
   let identityMatrix: number[][] = Array.from({ length: 2 * n }, () =>
     Array(2 * n).fill(0),
@@ -367,9 +404,9 @@ function padeNextFrame(
     builtMatrix.push(zeroN.concat(identityMatrix[i]).concat([0]));
   }
   for (var i = 0; i < 2 * n; i++) {
-    // builtMatrix.push(F[i].concat(zeroN).concat(V[i]));
+    builtMatrix.push(F[i].concat(zeroN).concat(V[i]));
     // builtMatrix.push(zeroN.concat(zeroN).concat(0));
-    builtMatrix.push(zeroN.concat(zeroN).concat(V[i]));
+    // builtMatrix.push(zeroN.concat(zeroN).concat(V[i]));
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));

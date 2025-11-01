@@ -17,6 +17,7 @@ let testSpine = new Spine(
     new Point(200, 260),
     new Point(260, 260),
     new Point(260, 200),
+    new Point(260, 300),
   ],
 );
 let keyboard = {};
