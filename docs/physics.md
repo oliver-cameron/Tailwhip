@@ -1,32 +1,44 @@
-This document shows the ideas behind the new physics engine.
-The current state vector $u_{0}$ is written as a matrix with position and velocity of each point, as well as other variables that update continuously with time, both influence and are influenced by position and velocity of afformentioned points, 
-<!-- $`\matrix{1}`$ -->
-[desmos link here. doesn't work](https://www.desmos.com/calculator/2pmsjdf9uj)
+# Tailwhip Physics Overview
+> *"Since Newton, mankind has come to realise that the **laws of physics** are always expressed in the language of **differential equations**."* - Steven Strogatz
+## Importance of Exponentiation
+(For an explanation better than I could ever do, 3B1B has [a great one](https://www.youtube.com/watch?v=O85OWBJ2ayo&list=PLZHQObOWTQDNPOjrT6KVlfJuKtYTftqH6) on this topic)
 
-Inputs: $P_0$, $P_1$, $P_2$, $P_3$, $Q_0$, $Q_1$, $Q_2$, $Q_3 \in \mathbb{C}$
+Take the derivative identity for exponents:
+```math
+\frac{d}{dt} e^{At} = A e^{At}
+```
+Note how the derivative of the function for this exponential contains itself, but it is multiplied by some constant, $A$.\
+From this, we can solve any linear system of differential equations. Let
+```math
+\frac{dx}{dt} = Ax
+```
+then we can define $x$ as a function of $t$.
+```math
+x(t) = x(0)e^{At}
+```
 
-Define cubic beziers:
+So how does this relate to the physics engine? We can think of our entire game system, all of the forces, positions, velocities and more, as a system of differential equations. While *arbitrary* differential equations are famously difficult to solve, we have a way to solve any *linear* system.\
+Let's rename a few terms. $x(t)$ will be $u_1$, and $x(0) \rightarrow u_0$
 ```math
-P_c(t) = \begin{bmatrix}t^3&t^2&t&1\end{bmatrix}\begin{bmatrix}-1&3&-3&1\\
-3&-6&3&0\\
--3&3&0&0\\
-1&0&0&0\end{bmatrix}\begin{bmatrix}P_0\\P_1\\P_2\\P_3\end{bmatrix}\\\therefore
-P_c'(t) = \begin{bmatrix}t^2&t&1\end{bmatrix}\begin{bmatrix}-3&9&-9&3\\
-6&-12&6&0\\
--3&3&0&0\\\end{bmatrix}\begin{bmatrix}P_0\\P_1\\P_2\\P_3\end{bmatrix}\\
+\therefore
+u_1 = u_0e^{At}
 ```
-Beziers are similar for $Q_c(t)$ and $Q_c'(t)$
+But these are all numbers? How can we put a whole system in just one equation?\
+Well who said anything about numbers? Enter [matricies](https://en.wikipedia.org/wiki/Matrix_(mathematics)) and [linear algebra](https://en.wikipedia.org/wiki/Linear_algebra).
+For some context, $u_1$ is our predicted next frame, $u_0$ is the current frame, and $A$ is the approximation of all the forces. As for what these are, read on.
 
-Use the winding number for paths $P_L$ and $Q_L$. Multiply winding numbers together to find if the point is inside both paths.
-```math
-A = \iint_F{-\frac{1}{4π^2}\left(\oint_{P_L}{\frac{1}{p-u}\mathrm{d}p}\right)\left(\oint_{Q_L}{\frac{1}{q-u}\mathrm{d}q}\right)\mathrm{d}u}
-```
-Rewrite the winding number expression to use the derivative of $atan2()$
-```math
-\frac{\partial x}{\partial atan2} = -\frac{y}{x^2 + y^2}
-\frac{\partial y}{\partial atan2} =  \frac{x}{x^2 + y^2}
-```
-Recalling the multivariable chain rule $\frac{\partial y}{\partial x} = \frac{\partial y}{\partial a}\frac{\partial a}{\partial x} + \frac{\partial y}{\partial b}\frac{\partial b}{\partial x}$, the inside of the path integrals becomes
-```math
+## Shape of the terms
+> A matrix looks like a rectangular grid of numbers. An a by b matrix has a rows and b columns, whoever decided that needs to go to jail, but that's how it is. \
+ You add matricies term by term, but only if they are the same shape (size).\
+  You can also multiply these, but only if the amount of columns in the first match up with the amount of rows in the next. Also, matrix multiplication is non-communative, so matrix $p$ times matrix $q$ isn't equal to $q$ times $p$, and it may even be invalid. \
+  You can even raise a number to the power of a matrix as long as the matrix is square, although it's tricky to get your head around. Matrix exponentiation is the core idea behind the engine.
 
-```
+As described earlier, $u_0$ and $u_1$ are the frames. More specifically, they are an n by 1 [*state vector*](https://en.wikipedia.org/wiki/State-space_representation), just a column of a matrix, with components corresponding to the position of points, velocities, and one constant term used for balancing.
+
+$A$ is a n by n square [*jacobi matrix*](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) that encodes all of the forces. You may notice that the state vector $u_0$ is the same height as this jacobi matrix, and if you turn the vector to it's side, so it now runs across instead of down, it is the same width as the matrix. This is no coincidence.\
+Think of the top of the jacobi matrix as the input, and the right as the output. For some output component, we turn our vector to the side, and drag it down to the row that corresponds to our output component. Multiply each component of the state vector by each element in the row, then add the products. The final sum determines how that component changes over time (it's derivative with respect to time).
+
+Note that this ability of applying a vector to a matrix is not unique to jacobi matricies, it's the way we're using it to approximate a more detailed system in a physics sense that arises the jacobian.
+### Example of the matricies in action
+Let's start with some unrealistic whirlpool force (Images and matricies taken from that 3B1B video's code).
+

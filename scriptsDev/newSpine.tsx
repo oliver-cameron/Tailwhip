@@ -176,8 +176,10 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
 console.table(
   padeApproximation(
     [
-      [1, 2],
-      [0, -1],
+[0,0,1,0],
+[0,0,0,1],
+[0,1,0,0],
+[-1,0,0,0],
     ],
     5,
   ),
@@ -308,19 +310,112 @@ let springForces: {
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
     targetLength: (targetLength * 10) / 27,
-    stiffness: 0,
+    stiffness: 1,
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
     targetLength: (targetLength * 7) / 27,
-    stiffness: 0,
+    stiffness: 1,
   },
   {
     coefficients: [0, 1, -1, 0],
     targetLength: (targetLength * 10) / 27,
-    stiffness: 0.05,
+    stiffness: 1,
   },
 ];
+let pointAmount = 6;
+let springData: {coefficients: number[]; targetLength: number; stiffness: number;}[] = [{coefficients:[],targetLength:0,stiffness:0}];
+for(var i=0;i<springForces.length;i++){
+  for(var j=0; j < pointAmount - 3;j++){
+    let coeffRow = Array(pointAmount).fill(0);
+    coeffRow.splice(j,4,...springForces[i].coefficients);
+    springData.push({
+      coefficients:coeffRow,
+      targetLength:springForces[i].targetLength,
+      stiffness:springForces[i].stiffness,
+    })
+  }
+  // Handle start
+  let coeffRowStart = Array(pointAmount).fill(0);
+  let startCoeffs = [...springForces[i].coefficients];
+  startCoeffs[1] += startCoeffs[0];
+  startCoeffs[2] -= startCoeffs[0]*2;
+  coeffRowStart.splice(0,3,...startCoeffs.slice(1));
+  springData.push({
+    coefficients:coeffRowStart,
+    targetLength:springForces[i].targetLength,
+    stiffness:springForces[i].stiffness,
+  })  
+  // Handle end
+  let coeffRowEnd = Array(pointAmount).fill(0);
+  let endCoeffs = [...springForces[i].coefficients];
+  endCoeffs[endCoeffs.length-2] -= endCoeffs[endCoeffs.length-1]*2;
+  endCoeffs[endCoeffs.length-3] += endCoeffs[endCoeffs.length-1];
+  coeffRowEnd.splice(pointAmount-3,3,...endCoeffs.slice(0,endCoeffs.length-1));
+  springData.push({
+    coefficients:coeffRowEnd,
+    targetLength:springForces[i].targetLength,
+    stiffness:springForces[i].stiffness,
+  })
+}
+springData = springData.slice(1);
+function bodySprings(spinePosition: Point[]): {F: number[][]; V: number[]}{
+  console.log(spinePosition)
+  let n = spinePosition.length;
+   let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
+   let V = new Array(2 * n).fill(0).map(() => 0); 
+  for(var i = 0; i < springData.length; i++){
+    let coeffs = springData[i].coefficients;
+    let targetLength = springData[i].targetLength;
+    let stiffness = springData[i].stiffness;
+    let S: Point = coeffs
+      .map((o, index) => spinePosition[index].scale(o))
+      .reduce((a, b) => a.add(b));
+    let invSlen = 1/S.length();
+    let sLenNeg3 = invSlen ** 3;
+    // tslen = T / |s|
+    let tslen = (targetLength * invSlen);
+    // First, we compute V
+    // Handle X
+    let xv = coeffs.map((o) => -2 * stiffness * o * S.x * (1 - tslen));
+    for(var j = 0; j < n; j++){
+      V[j] += xv[j];
+    }
+    // Handle Y
+    let yv = coeffs.map((o) => -2 * stiffness * o * S.y * (1 - tslen));
+    for(var j = 0; j < n; j++){
+      V[j + n] += yv[j];
+    }
+    // Then, we compute F's blocks
+    // Handle XX
+    // tsxl = T sx^2 / |s|^3
+    let tsxl = targetLength * sLenNeg3 * S.x * S.x;
+    for(var a = 0; a < n; a++){
+      for(var b = 0; b < n; b++){
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsxl);
+        F[a][b] += addVal;
+      }
+    }
+    // Handle YY
+    let tsyl = targetLength * sLenNeg3 * S.y * S.y;
+    for(var a = 0; a < n; a++){
+      for(var b = 0; b < n; b++){
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsyl);
+        F[a + n][b + n] += addVal;
+      }
+    }
+    // Handle XY (yx block is the same)
+    let tsxy = targetLength * sLenNeg3 * S.x * S.y;
+    for(var a = 0; a < n; a++){
+      for(var b = 0; b < n; b++){
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * tsxy;
+        F[a][b + n] += addVal;
+        F[a + n][b] += addVal;
+      }
+    }
+  }
+    return {F,V};
+}
 function padeNextFrame(
   spinePosition: Point[],
   spineVel: Point[],
@@ -330,60 +425,7 @@ function padeNextFrame(
   // Vector values are p1x, p2x, p3x, ..., p1y, p2y, p3y, ... v1x, v2x, v3x, ..., v1y, v2y, v3y, ..., 1
   // > 1. Construct blocks for dynamic force matrix (nxn), f and static force vector (nx1), v
   let n = spinePosition.length;
-  let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
-  let V = new Array(2 * n).fill(0).map(() => 0);
-  for (var i = -1; i < n - 2; i++) {
-    let indecies = [i, i + 1, i + 2, i + 3];
-    if (i == -1) {
-      indecies = [0, 1, 2];
-    }
-    if (i == n - 3) {
-      indecies = [n - 3, n - 2, n - 1];
-    }
-    for (var j = 0; j < springForces.length; j++) {
-      let coeffs = springForces[j].coefficients;
-      let targetLength = springForces[j].targetLength;
-      let stiffness = springForces[j].stiffness;
-      // if (i == -1) {
-      //   break;
-      //   coeffs[1] += coeffs[0];
-      //   coeffs[2] -= coeffs[0] * 2;
-      //   coeffs = coeffs.slice(1);
-      // }
-      // if (i == n - 3) {
-      //   break;
-      //   coeffs[1] -= coeffs[3] * 2;
-      //   coeffs[2] += coeffs[3];
-      //   coeffs = coeffs.slice(0, 3);
-      // }
-      let S: Point = indecies
-        .map((o, index) => spinePosition[o].scale(coeffs[index]))
-        .reduce((a, b) => a.add(b));
-      let sLen = Math.hypot(S.x, S.y);
-      let sLenNeg3 = Math.pow(sLen, -3);
-      for (var k = 0; k < indecies.length; k++) {
-        for (var a1 = 0; a1 < 2; a1++) {
-          let t1 = 2 * (a1 == 0 ? S.x : S.y) * coeffs[k] * stiffness;
-          V[indecies[k] + n * a1] -= (t1 * (sLen - targetLength)) / sLen;
-          for (var l = 0; l < indecies.length; l++) {
-            // F[indecies[k] + n * a1][indecies[l]] += S.x * lm;
-            // This is completely incorrect. Don't listen to past Oliver. He is a bit silly. Use the stuff in your notebook.
-            for (var a2 = 0; a2 < 2; a2++) {
-              let scsd = (a1 == 0 ? S.x : S.y) * (a2 == 0 ? S.x : S.y);
-              let lm = 2 * coeffs[l] * coeffs[k];
-              let Nf = F[indecies[k] + n * a1][indecies[l] + n * a2];
-              Nf -= (stiffness * scsd) / sLenNeg3;
-              if (a1 == a2) {
-                Nf -= 1 - stiffness / sLen;
-              }
-              F[indecies[k] + n * a1][indecies[l] + n * a2] =
-                Nf * coeffs[k] * coeffs[l];
-            }
-          }
-        }
-      }
-    }
-  }
+  let {F, V} = bodySprings(spinePosition);
   //Subroutine: Change last column of matrix to account for velocity
   let shiftPos = spinePosition
     .map((o) => [[[o.x]], [[o.y]]])
@@ -404,9 +446,8 @@ function padeNextFrame(
     builtMatrix.push(zeroN.concat(identityMatrix[i]).concat([0]));
   }
   for (var i = 0; i < 2 * n; i++) {
-    builtMatrix.push(F[i].concat(zeroN).concat(V[i]));
-    // builtMatrix.push(zeroN.concat(zeroN).concat(0));
-    // builtMatrix.push(zeroN.concat(zeroN).concat(V[i]));
+    // also add some minor damping
+    builtMatrix.push(F[i].concat(identityMatrix[i].map((val) => val * -1)).concat([V[i]]));
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));

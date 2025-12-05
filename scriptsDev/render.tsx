@@ -5,6 +5,8 @@ var app = new PIXI.Application();
 // (async function () {
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
 console.log(app);
+console.log("hello")
+console.log(PIXI);
 document.getElementById("graphics").appendChild(app.canvas);
 // })();
 let gfx = new PIXI.Graphics();
@@ -18,6 +20,7 @@ let testSpine = new Spine(
     new Point(260, 260),
     new Point(260, 200),
     new Point(260, 300),
+    new Point(300, 310),
   ],
 );
 let keyboard = {};
@@ -31,16 +34,16 @@ app.stage.addChild(gfx);
 app.ticker.add((delta) => {
   let headForce = Point.zero;
   if (keyboard["w"]) {
-    headForce = headForce.add(new Point(0, -500));
+    headForce = headForce.add(new Point(0, -10));
   }
   if (keyboard["a"]) {
-    headForce = headForce.add(new Point(-500, 0));
+    headForce = headForce.add(new Point(-10, 0));
   }
   if (keyboard["s"]) {
-    headForce = headForce.add(new Point(0, 500));
+    headForce = headForce.add(new Point(0, 10));
   }
   if (keyboard["d"]) {
-    headForce = headForce.add(new Point(500, 0));
+    headForce = headForce.add(new Point(10, 0));
   }
   // console.log(headForce);
   // Update spine
