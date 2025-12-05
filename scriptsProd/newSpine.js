@@ -258,7 +258,6 @@ function padeApproximation(Matrix, order) {
     let y = Array(size).fill(0).map(() => 0);
     for (var i = 0;i < size; i++) {
       let sum = numerator[i][v];
-      console.log();
       if (i !== 0) {
         for (var j = 0;j < i; j++) {
           sum -= L[i][j] * y[j];
@@ -279,28 +278,22 @@ function padeApproximation(Matrix, order) {
   }
   return x;
 }
-console.table(padeApproximation([
-  [0, 0, 1, 0],
-  [0, 0, 0, 1],
-  [0, 1, 0, 0],
-  [-1, 0, 0, 0]
-], 5));
-var targetLength = 20;
+var bodyLineLength = 50;
 var springForces = [
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
-    targetLength: targetLength * 10 / 27,
-    stiffness: 1
+    targetLength: bodyLineLength * 10 / 27,
+    stiffness: 40
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
-    targetLength: targetLength * 7 / 27,
-    stiffness: 1
+    targetLength: bodyLineLength * 7 / 27,
+    stiffness: 40
   },
   {
-    coefficients: [0, 1, -1, 0],
-    targetLength: targetLength * 10 / 27,
-    stiffness: 1
+    coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
+    targetLength: bodyLineLength * 10 / 27,
+    stiffness: 40
   }
 ];
 var pointAmount = 6;
@@ -317,8 +310,8 @@ for (i = 0;i < springForces.length; i++) {
   }
   let coeffRowStart = Array(pointAmount).fill(0);
   let startCoeffs = [...springForces[i].coefficients];
-  startCoeffs[1] += startCoeffs[0];
-  startCoeffs[2] -= startCoeffs[0] * 2;
+  startCoeffs[1] += startCoeffs[0] * 2;
+  startCoeffs[2] -= startCoeffs[0];
   coeffRowStart.splice(0, 3, ...startCoeffs.slice(1));
   springData.push({
     coefficients: coeffRowStart,
@@ -327,8 +320,8 @@ for (i = 0;i < springForces.length; i++) {
   });
   let coeffRowEnd = Array(pointAmount).fill(0);
   let endCoeffs = [...springForces[i].coefficients];
-  endCoeffs[endCoeffs.length - 2] -= endCoeffs[endCoeffs.length - 1] * 2;
-  endCoeffs[endCoeffs.length - 3] += endCoeffs[endCoeffs.length - 1];
+  endCoeffs[endCoeffs.length - 2] -= endCoeffs[endCoeffs.length - 1];
+  endCoeffs[endCoeffs.length - 3] += endCoeffs[endCoeffs.length - 1] * 2;
   coeffRowEnd.splice(pointAmount - 3, 3, ...endCoeffs.slice(0, endCoeffs.length - 1));
   springData.push({
     coefficients: coeffRowEnd,
@@ -339,19 +332,19 @@ for (i = 0;i < springForces.length; i++) {
 var j;
 var i;
 springData = springData.slice(1);
+console.log(springData);
 function bodySprings(spinePosition) {
-  console.log(spinePosition);
   let n = spinePosition.length;
   let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
   let V = new Array(2 * n).fill(0).map(() => 0);
   for (var i2 = 0;i2 < springData.length; i2++) {
     let coeffs = springData[i2].coefficients;
-    let targetLength2 = springData[i2].targetLength;
+    let targetLength = springData[i2].targetLength;
     let stiffness = springData[i2].stiffness;
     let S = coeffs.map((o, index) => spinePosition[index].scale(o)).reduce((a2, b2) => a2.add(b2));
     let invSlen = 1 / S.length();
     let sLenNeg3 = invSlen ** 3;
-    let tslen = targetLength2 * invSlen;
+    let tslen = targetLength * invSlen;
     let xv = coeffs.map((o) => -2 * stiffness * o * S.x * (1 - tslen));
     for (var j2 = 0;j2 < n; j2++) {
       V[j2] += xv[j2];
@@ -360,21 +353,21 @@ function bodySprings(spinePosition) {
     for (var j2 = 0;j2 < n; j2++) {
       V[j2 + n] += yv[j2];
     }
-    let tsxl = targetLength2 * sLenNeg3 * S.x * S.x;
+    let tsxl = targetLength * sLenNeg3 * S.x * S.x;
     for (var a = 0;a < n; a++) {
       for (var b = 0;b < n; b++) {
         let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsxl);
         F[a][b] += addVal;
       }
     }
-    let tsyl = targetLength2 * sLenNeg3 * S.y * S.y;
+    let tsyl = targetLength * sLenNeg3 * S.y * S.y;
     for (var a = 0;a < n; a++) {
       for (var b = 0;b < n; b++) {
         let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsyl);
         F[a + n][b + n] += addVal;
       }
     }
-    let tsxy = targetLength2 * sLenNeg3 * S.x * S.y;
+    let tsxy = targetLength * sLenNeg3 * S.x * S.y;
     for (var a = 0;a < n; a++) {
       for (var b = 0;b < n; b++) {
         let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * tsxy;

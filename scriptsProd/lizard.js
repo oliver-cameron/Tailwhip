@@ -159,6 +159,12 @@ var geo_default = { Point, Curve, other };
 
 // scriptsDev/lizard.tsx
 class Lizard {
+  static dub = (p) => {
+    return p.concat(p.map((o) => ({
+      index: o.index,
+      offset: new Point(o.offset.x, -o.offset.y)
+    })).reverse());
+  };
   id;
   spine;
   vel;
@@ -206,15 +212,15 @@ var lizardCharacters = {
       clockwise: false
     }
   ],
-  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), [
+  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
     { index: 5, offset: new Point(0, 4) },
     { index: 4, offset: new Point(0, 7) },
     { index: 3, offset: new Point(0, 10) },
     { index: 2, offset: new Point(-15, 20) },
     { index: 1, offset: new Point(0, 16) },
     { index: 0, offset: new Point(0, 20) },
-    { index: 0, offset: new Point(20, 10) }
-  ]),
+    { index: 0, offset: new Point(-20, 10) }
+  ])),
   others: {},
   updateSpine(lizard, direction, origin, deltaT) {
     let newSpine = lizard.spine;
@@ -272,6 +278,14 @@ var lizardCharacters = {
       ctx.lineTo(hand.x, hand.y);
       ctx.stroke();
     }
+    let bodyShapePoints = lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
+    ctx.lineStyle(3, 65280, 1);
+    ctx.moveTo(bodyShapePoints[0].x, bodyShapePoints[0].y);
+    for (var i = 1;i < bodyShapePoints.length; i++) {
+      ctx.lineTo(bodyShapePoints[i].x, bodyShapePoints[i].y);
+    }
+    ctx.closePath();
+    ctx.stroke();
   }
 };
 var lizard_default = { lizardCharacters, Lizard };

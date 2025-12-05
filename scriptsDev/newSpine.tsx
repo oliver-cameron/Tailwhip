@@ -109,7 +109,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
       row.map((val, j) => (i === j ? 1 : 0)),
     ),
   ];
-  // console.log("DeltaMat", deltaMat);
+
   let coefficients: number[] = [1];
   for (let i = 1; i <= order; i++) {
     powerCache.push(multiplyMatrices(powerCache[i - 1], deltaMat));
@@ -118,14 +118,14 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
         (factorial(order * 2) * factorial(i) * factorial(order - i)),
     );
   }
-  // console.log("PowerCache", powerCache);
-  // console.log("Coefficients", coefficients);
+
+
   let numerator = powerCache
     .map((i, index) =>
       i.map((row) => row.map((val) => val * coefficients[index])),
     )
     .reduce((a, b) => matrixAddition(a, b));
-  // console.log("Numerator", numerator);
+
   let denominator = powerCache
     .map((i, index) =>
       i.map((row) =>
@@ -136,7 +136,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
     )
     .reduce((a, b) => matrixAddition(a, b));
 
-  // console.log("Denominator", denominator);
+
   // LU decomposition of denominator
   let { L, U } = LUDecompose(denominator);
   let x: number[][] = Array.from({ length: size }, () => Array(size).fill(0));
@@ -148,7 +148,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
       .map(() => 0);
     for (var i = 0; i < size; i++) {
       let sum = numerator[i][v];
-      console.log();
+
       if (i !== 0) {
         for (var j = 0; j < i; j++) {
           sum -= L[i][j] * y[j];
@@ -156,7 +156,7 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
       }
       y[i] = sum / L[i][i];
     }
-    // console.log("Y", y);
+
     // Backward substitution
     for (var i = size - 1; i >= 0; i--) {
       let sum = y[i];
@@ -173,28 +173,6 @@ function padeApproximation(Matrix: number[][], order: number): number[][] {
   }
   return x;
 }
-console.table(
-  padeApproximation(
-    [
-[0,0,1,0],
-[0,0,0,1],
-[0,1,0,0],
-[-1,0,0,0],
-    ],
-    5,
-  ),
-);
-// console.table(
-//   krylovApproximation(
-//     [
-//       [1, 2],
-//       [-1, 3],
-//     ],
-//     [1, 0],
-//     5,
-//     1,
-//   ),
-// );
 function krylovApproximation(
   matrix: number[][],
   start: number[],
@@ -205,7 +183,7 @@ function krylovApproximation(
   let B = matrix.map((row) => row.map((val) => val * delta));
   let m = order;
   let Q: number[][] = Array.from({ length: m + 1 }, () => Array(n).fill(0));
-  console.log(Q);
+
   let startNorm = Math.sqrt(start.reduce((a, b) => a + b * b, 0));
   let q0 = start.map((val) => val / startNorm);
   for (var i = 0; i < n; i++) {
@@ -213,8 +191,8 @@ function krylovApproximation(
   }
   let H: number[][] = Array.from({ length: m + 1 }, () => Array(m).fill(0));
   let { Q: finalQ, H: finalH } = KAIteration(m, B, Q, H);
-  // console.log("Final Q", finalQ);
-  // console.log("Final H", finalH);
+
+
   let expH = padeApproximation(
     finalH.slice(0, m).map((row) => row.slice(0, m)),
     6,
@@ -270,7 +248,7 @@ function KAIteration(
     }
     let norm = Math.sqrt(qk.reduce((a, b) => a + b * b, 0));
     if (norm < 1e-10) {
-      console.warn("Matrix has deficient rank");
+
     }
     qk = qk.map((val) => val / norm);
     for (var i = 0; i < n; i++) {
@@ -280,28 +258,7 @@ function KAIteration(
   }
   return { Q, H };
 }
-let targetLength = 20;
-// let springForces: {
-//   coefficients: number[];
-//   targetLength: number;
-//   stiffness: number;
-// }[] = [
-//   {
-//     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
-//     targetLength: (targetLength * 10) / 27,
-//     stiffness: 0.05,
-//   },
-//   {
-//     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
-//     targetLength: (targetLength * 7) / 27,
-//     stiffness: 0.05,
-//   },
-//   {
-//     coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
-//     targetLength: (targetLength * 10) / 27,
-//     stiffness: 0.05,
-//   },
-// ];
+let bodyLineLength = 50;
 let springForces: {
   coefficients: number[];
   targetLength: number;
@@ -309,18 +266,18 @@ let springForces: {
 }[] = [
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
-    targetLength: (targetLength * 10) / 27,
-    stiffness: 1,
+    targetLength: (bodyLineLength * 10) / 27,
+    stiffness: 40,
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
-    targetLength: (targetLength * 7) / 27,
-    stiffness: 1,
+    targetLength: (bodyLineLength * 7) / 27,
+    stiffness: 40,
   },
   {
-    coefficients: [0, 1, -1, 0],
-    targetLength: (targetLength * 10) / 27,
-    stiffness: 1,
+    coefficients: [-1 / 18, 10/27, -11 / 54, -1/9],
+    targetLength: (bodyLineLength * 10) / 27,
+    stiffness: 40,
   },
 ];
 let pointAmount = 6;
@@ -338,8 +295,8 @@ for(var i=0;i<springForces.length;i++){
   // Handle start
   let coeffRowStart = Array(pointAmount).fill(0);
   let startCoeffs = [...springForces[i].coefficients];
-  startCoeffs[1] += startCoeffs[0];
-  startCoeffs[2] -= startCoeffs[0]*2;
+  startCoeffs[1] += startCoeffs[0] * 2;
+  startCoeffs[2] -= startCoeffs[0];
   coeffRowStart.splice(0,3,...startCoeffs.slice(1));
   springData.push({
     coefficients:coeffRowStart,
@@ -349,8 +306,8 @@ for(var i=0;i<springForces.length;i++){
   // Handle end
   let coeffRowEnd = Array(pointAmount).fill(0);
   let endCoeffs = [...springForces[i].coefficients];
-  endCoeffs[endCoeffs.length-2] -= endCoeffs[endCoeffs.length-1]*2;
-  endCoeffs[endCoeffs.length-3] += endCoeffs[endCoeffs.length-1];
+  endCoeffs[endCoeffs.length-2] -= endCoeffs[endCoeffs.length-1];
+  endCoeffs[endCoeffs.length-3] += endCoeffs[endCoeffs.length-1] * 2;
   coeffRowEnd.splice(pointAmount-3,3,...endCoeffs.slice(0,endCoeffs.length-1));
   springData.push({
     coefficients:coeffRowEnd,
@@ -359,8 +316,9 @@ for(var i=0;i<springForces.length;i++){
   })
 }
 springData = springData.slice(1);
+console.log(springData);
 function bodySprings(spinePosition: Point[]): {F: number[][]; V: number[]}{
-  console.log(spinePosition)
+
   let n = spinePosition.length;
    let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
    let V = new Array(2 * n).fill(0).map(() => 0); 
@@ -451,8 +409,8 @@ function padeNextFrame(
   }
   builtMatrix.push(zeroN.concat(zeroN).concat(0));
   builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));
-  // console.clear();
-  // console.table(V);
+
+
   let a0 = spinePosition
     .map((o) => o.x)
     .concat(spinePosition.map((o) => o.y))
