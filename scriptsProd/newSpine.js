@@ -283,17 +283,17 @@ var springForces = [
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
     targetLength: bodyLineLength * 10 / 27,
-    stiffness: 40
+    stiffness: 50
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
     targetLength: bodyLineLength * 7 / 27,
-    stiffness: 40
+    stiffness: 50
   },
   {
     coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
     targetLength: bodyLineLength * 10 / 27,
-    stiffness: 40
+    stiffness: 50
   }
 ];
 var pointAmount = 6;
@@ -320,8 +320,8 @@ for (i = 0;i < springForces.length; i++) {
   });
   let coeffRowEnd = Array(pointAmount).fill(0);
   let endCoeffs = [...springForces[i].coefficients];
-  endCoeffs[endCoeffs.length - 2] -= endCoeffs[endCoeffs.length - 1];
-  endCoeffs[endCoeffs.length - 3] += endCoeffs[endCoeffs.length - 1] * 2;
+  endCoeffs[endCoeffs.length - 3] -= endCoeffs[endCoeffs.length - 1];
+  endCoeffs[endCoeffs.length - 2] += endCoeffs[endCoeffs.length - 1] * 2;
   coeffRowEnd.splice(pointAmount - 3, 3, ...endCoeffs.slice(0, endCoeffs.length - 1));
   springData.push({
     coefficients: coeffRowEnd,

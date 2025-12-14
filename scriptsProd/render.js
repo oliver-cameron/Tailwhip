@@ -286,6 +286,9 @@ var lizardCharacters = {
     }
     ctx.closePath();
     ctx.stroke();
+  },
+  outline(lizard) {
+    return lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
   }
 };
 var lizard_default = { lizardCharacters, Lizard };
@@ -416,17 +419,17 @@ var springForces = [
   {
     coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
     targetLength: bodyLineLength * 10 / 27,
-    stiffness: 40
+    stiffness: 50
   },
   {
     coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
     targetLength: bodyLineLength * 7 / 27,
-    stiffness: 40
+    stiffness: 50
   },
   {
     coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
     targetLength: bodyLineLength * 10 / 27,
-    stiffness: 40
+    stiffness: 50
   }
 ];
 var pointAmount = 6;
@@ -453,8 +456,8 @@ for (i = 0;i < springForces.length; i++) {
   });
   let coeffRowEnd = Array(pointAmount).fill(0);
   let endCoeffs = [...springForces[i].coefficients];
-  endCoeffs[endCoeffs.length - 2] -= endCoeffs[endCoeffs.length - 1];
-  endCoeffs[endCoeffs.length - 3] += endCoeffs[endCoeffs.length - 1] * 2;
+  endCoeffs[endCoeffs.length - 3] -= endCoeffs[endCoeffs.length - 1];
+  endCoeffs[endCoeffs.length - 2] += endCoeffs[endCoeffs.length - 1] * 2;
   coeffRowEnd.splice(pointAmount - 3, 3, ...endCoeffs.slice(0, endCoeffs.length - 1));
   springData.push({
     coefficients: coeffRowEnd,
@@ -565,31 +568,52 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
+function drawKSplineSegment(p0, p1, p2, p3) {
+  let b0 = p1;
+  let b1 = {
+    x: p1.x - 0.25 * p0.x + 0.25 * p2.x,
+    y: p1.y - 0.25 * p0.y + 0.25 * p2.y
+  };
+  let b2 = {
+    x: 0.25 * p1.x + p2.x - 0.25 * p3.x,
+    y: 0.25 * p1.y + p2.y - 0.25 * p3.y
+  };
+  let b3 = p2;
+  gfx.moveTo(b0.x, b0.y);
+  gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
+}
 app.stage.addChild(gfx);
 app.ticker.add((delta) => {
   let headForce = Point.zero;
   if (keyboard["w"]) {
-    headForce = headForce.add(new Point(0, -10));
+    headForce = headForce.add(new Point(0, -100));
   }
   if (keyboard["a"]) {
-    headForce = headForce.add(new Point(-10, 0));
+    headForce = headForce.add(new Point(-100, 0));
   }
   if (keyboard["s"]) {
-    headForce = headForce.add(new Point(0, 10));
+    headForce = headForce.add(new Point(0, 100));
   }
   if (keyboard["d"]) {
-    headForce = headForce.add(new Point(10, 0));
+    headForce = headForce.add(new Point(100, 0));
   }
   testSpine = updateSpine(testSpine, headForce, delta.deltaTime);
   gfx.clear();
   gfx.lineStyle(4, 1, 1);
   gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
-  for (let i2 = 1;i2 < testSpine.points.length; i2++) {
-    gfx.lineTo(testSpine.points[i2].x, testSpine.points[i2].y);
+  for (let i3 = 1;i3 < testSpine.points.length; i3++) {
+    gfx.lineTo(testSpine.points[i3].x, testSpine.points[i3].y);
   }
   gfx.stroke();
   lizardCharacters.myCharacter.spine = testSpine.points;
-  lizardCharacters.draw(lizardCharacters.myCharacter, gfx);
+  let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
+  gfx.lineStyle(2, 255, 1);
+  gfx.moveTo(outline[0].x, outline[0].y);
+  for (var i2 = 0;i2 < outline.length; i2++) {
+    drawKSplineSegment(outline[(i2 - 1 + outline.length) % outline.length], outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length]);
+  }
+  gfx.closePath();
+  gfx.stroke();
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",
     "walk",

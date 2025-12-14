@@ -286,6 +286,9 @@ var lizardCharacters = {
     }
     ctx.closePath();
     ctx.stroke();
+  },
+  outline(lizard) {
+    return lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
   }
 };
 var lizard_default = { lizardCharacters, Lizard };

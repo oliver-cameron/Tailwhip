@@ -40,5 +40,16 @@ Think of the top of the jacobi matrix as the input, and the right as the output.
 
 Note that this ability of applying a vector to a matrix is not unique to jacobi matricies, it's the way we're using it to approximate a more detailed system in a physics sense that arises the jacobian.
 ### Example of the matricies in action
-Let's start with some unrealistic whirlpool force (Images and matricies taken from that 3B1B video's code).
+Let's start with some unrealistic whirlpool force.
 
+
+# Collision detection
+Normal cost (Area of intersection):
+```math
+C_N = \frac{1}{2} \oint_{C}{\left(x{\mathrm{d}y} - y{\mathrm{d}x}\right)}
+```
+Tangental cost (Total vorticity/discrepancy of velocity):
+```math
+C_T = \frac{1}{2} \oint_{C}{\left(v(r) \cdot \mathrm{d}r\right)}
+```
+where $v(r)$ is the velocity at point r. That's a dot product there by the way.
