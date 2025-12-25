@@ -1,5 +1,6 @@
 # Tailwhip Physics Overview
 > *"Since Newton, mankind has come to realise that the **laws of physics** are always expressed in the language of **differential equations**."* - Steven Strogatz
+# Core idea #1:  Matrix exponentiation
 ## Importance of Exponentiation
 (For an explanation better than I could ever do, 3B1B has [a great one](https://www.youtube.com/watch?v=O85OWBJ2ayo&list=PLZHQObOWTQDNPOjrT6KVlfJuKtYTftqH6) on this topic)
 
@@ -42,6 +43,17 @@ Note that this ability of applying a vector to a matrix is not unique to jacobi 
 ### Example of the matricies in action
 Let's start with some unrealistic whirlpool force.
 
+# Core idea #2: Force and the Potential energy gradient
+Another important idea in physics, especially in this engine, is the equation for force. In words, *Force is the negative gradient of potential energy*. In a 1d case, with a single point v, that looks like this:
+```math
+F_v = -\frac{dP}{dv}
+```
+where $F_v$ is the force on v, and $\frac{dP}{dv}$ is the derivative of potential energy (how potential energy changes) relative to v. Or, it can look like this:
+```math
+m\frac{d\dot{v}}{dt}=-\frac{dP}{dv}
+```
+where $m$ is mass, $\dot{v}$ is the velocity of v, so $\frac{d\dot{v}}{dt}$ is the acceleration on $v$. (remember f=ma).
+Basically, if we can find how the potential energy is changed by position, we can find how velocity is channged by time.
 
 # Collision detection
 Normal cost (Area of intersection):

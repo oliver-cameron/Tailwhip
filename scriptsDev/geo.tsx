@@ -101,19 +101,6 @@ export class Curve {
       .add(coeff.t2 ? coeff.t2.scale(t ** 2) : Point.zero)
       .add(coeff.t3 ? coeff.t3.scale(t ** 3) : Point.zero);
   }
-
-  pass = ["p0", "p1", "p2", "p3"]
-    .map((o) => [this[o].x, this[o].y])
-    .reduce((a, b) => a.concat(b)) as [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
   boundingBox(): { lowest: Point; highest: Point } {
     let vCoeff: { t3: Point; t2: Point; t1: Point; t0: Point } = this.coeff();
     let d1Coeff: { t2: Point; t1: Point; t0: Point } = this.coeff1Dir();

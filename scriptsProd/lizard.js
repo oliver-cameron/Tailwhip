@@ -76,7 +76,6 @@ class Curve {
   value(coeff, t) {
     return coeff.t0.add(coeff.t1.scale(t)).add(coeff.t2 ? coeff.t2.scale(t ** 2) : Point.zero).add(coeff.t3 ? coeff.t3.scale(t ** 3) : Point.zero);
   }
-  pass = ["p0", "p1", "p2", "p3"].map((o) => [this[o].x, this[o].y]).reduce((a, b) => a.concat(b));
   boundingBox() {
     let vCoeff = this.coeff();
     let d1Coeff = this.coeff1Dir();

@@ -76,7 +76,6 @@ class Curve {
   value(coeff, t) {
     return coeff.t0.add(coeff.t1.scale(t)).add(coeff.t2 ? coeff.t2.scale(t ** 2) : Point.zero).add(coeff.t3 ? coeff.t3.scale(t ** 3) : Point.zero);
   }
-  pass = ["p0", "p1", "p2", "p3"].map((o) => [this[o].x, this[o].y]).reduce((a, b) => a.concat(b));
   boundingBox() {
     let vCoeff = this.coeff();
     let d1Coeff = this.coeff1Dir();
@@ -545,6 +544,46 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   return { spinePosition: pos, spineVel: vel };
 }
 
+// scriptsDev/collide.tsx
+class detector {
+  static blobloop = [
+    new Point(500, 500),
+    new Point(500, 550),
+    new Point(550, 550),
+    new Point(550, 600),
+    new Point(500, 600),
+    new Point(500, 650),
+    new Point(450, 650),
+    new Point(450, 600),
+    new Point(400, 600),
+    new Point(400, 550),
+    new Point(450, 550),
+    new Point(450, 500)
+  ];
+  static getCurveBoundingBoxes(inputKString) {
+    let count = inputKString.length;
+    let curves = [];
+    for (var i2 = 0;i2 < count; i2++) {
+      curves.push(Curve.fromKSpline(inputKString[i2], inputKString[(i2 + 1) % count], inputKString[(i2 + 2) % count], inputKString[(i2 + 3) % count]));
+    }
+    return curves.map((o) => o.boundingBox()).map((o) => [o.lowest, o.highest]);
+  }
+  static AABB(col1, col2) {
+    let returnIndecies = [];
+    for (var i2 = 0;i2 < col1.length; i2++) {
+      for (var j2 = 0;j2 < col2.length; j2++) {
+        let xCol = Math.max(col1[i2][0].x, col2[j2][0].x) <= Math.min(col1[i2][1].x, col2[j2][1].x);
+        let yCol = Math.max(col1[i2][0].y, col2[j2][0].y) <= Math.min(col1[i2][1].y, col2[j2][1].y);
+        if (xCol && yCol) {
+          returnIndecies.push([i2, j2]);
+        }
+      }
+    }
+    return returnIndecies;
+  }
+}
+var collide_default = { detector };
+
 // scriptsDev/render.tsx
 var app = new PIXI.Application;
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
@@ -568,6 +607,7 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
+var blob = detector.blobloop;
 function drawKSplineSegment(p0, p1, p2, p3) {
   let b0 = p1;
   let b1 = {
@@ -613,6 +653,52 @@ app.ticker.add((delta) => {
     drawKSplineSegment(outline[(i2 - 1 + outline.length) % outline.length], outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length]);
   }
   gfx.closePath();
+  gfx.stroke();
+  gfx.lineStyle(2, 65280, 1);
+  gfx.moveTo(blob[1].x, blob[1].y);
+  for (var i2 = 0;i2 < blob.length; i2++) {
+    drawKSplineSegment(blob[i2], blob[(i2 + 1) % blob.length], blob[(i2 + 2) % blob.length], blob[(i2 + 3) % blob.length]);
+  }
+  gfx.stroke();
+  let lizBox = detector.getCurveBoundingBoxes(outline);
+  gfx.lineStyle(1, 16776960, 1);
+  for (var i2 = 0;i2 < lizBox.length; i2++) {
+    let curBox = lizBox[i2];
+    gfx.moveTo(curBox[0].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[0].y);
+  }
+  gfx.stroke();
+  let blobBox = detector.getCurveBoundingBoxes(blob);
+  gfx.lineStyle(1, 16776960, 1);
+  for (var i2 = 0;i2 < blobBox.length; i2++) {
+    let curBox = blobBox[i2];
+    gfx.moveTo(curBox[0].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[0].y);
+  }
+  gfx.stroke();
+  let collisionIndecies = detector.AABB(lizBox, blobBox);
+  gfx.lineStyle(1, 16711680, 1);
+  for (var i2 = 0;i2 < collisionIndecies.length; i2++) {
+    let collisionIndex = collisionIndecies[i2];
+    let curBox1 = lizBox[collisionIndex[0]];
+    gfx.moveTo(curBox1[0].x, curBox1[0].y);
+    gfx.lineTo(curBox1[1].x, curBox1[0].y);
+    gfx.lineTo(curBox1[1].x, curBox1[1].y);
+    gfx.lineTo(curBox1[0].x, curBox1[1].y);
+    gfx.lineTo(curBox1[0].x, curBox1[0].y);
+    let curBox2 = blobBox[collisionIndex[1]];
+    gfx.moveTo(curBox2[0].x, curBox2[0].y);
+    gfx.lineTo(curBox2[1].x, curBox2[0].y);
+    gfx.lineTo(curBox2[1].x, curBox2[1].y);
+    gfx.lineTo(curBox2[0].x, curBox2[1].y);
+    gfx.lineTo(curBox2[0].x, curBox2[0].y);
+  }
   gfx.stroke();
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",

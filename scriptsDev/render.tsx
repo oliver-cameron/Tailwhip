@@ -1,11 +1,12 @@
 import { lizardCharacters } from "./lizard";
 import { Point } from "./geo";
 import { Spine, updateSpine } from "./newSpine";
+import { detector } from "./collide";
 var app = new PIXI.Application();
 // (async function () {
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
 console.log(app);
-console.log("hello")
+console.log("hello");
 console.log(PIXI);
 document.getElementById("graphics").appendChild(app.canvas);
 // })();
@@ -30,6 +31,7 @@ window.addEventListener("keydown", (e) => {
 window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
+let blob = detector.blobloop;
 function drawKSplineSegment(p0, p1, p2, p3) {
   // Convert to Bézier control points
   let b0 = p1;
@@ -83,9 +85,69 @@ app.ticker.add((delta) => {
       outline[i],
       outline[(i + 1) % outline.length],
       outline[(i + 2) % outline.length],
-    )
+    );
   }
   gfx.closePath();
+  gfx.stroke();
+  // Draw Blob
+  gfx.lineStyle(2, 0x00ff00, 1);
+  gfx.moveTo(blob[1].x, blob[1].y);
+  for (var i = 0; i < blob.length; i++) {
+    drawKSplineSegment(
+      blob[i],
+      blob[(i + 1) % blob.length],
+      blob[(i + 2) % blob.length],
+      blob[(i + 3) % blob.length],
+    );
+  }
+  // gfx.closePath();
+  gfx.stroke();
+
+  // Lizard Character draw bounding box
+  let lizBox = detector.getCurveBoundingBoxes(outline);
+  gfx.lineStyle(1, 0xffff00, 1);
+  for (var i = 0; i < lizBox.length; i++) {
+    let curBox = lizBox[i];
+    gfx.moveTo(curBox[0].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[0].y);
+  }
+  gfx.stroke();
+
+  // Blob draw bounding box
+  // Lizard Character draw bounding box
+  let blobBox = detector.getCurveBoundingBoxes(blob);
+  gfx.lineStyle(1, 0xffff00, 1);
+  for (var i = 0; i < blobBox.length; i++) {
+    let curBox = blobBox[i];
+    gfx.moveTo(curBox[0].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[0].y);
+    gfx.lineTo(curBox[1].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[1].y);
+    gfx.lineTo(curBox[0].x, curBox[0].y);
+  }
+  gfx.stroke();
+  // Find collisions
+  let collisionIndecies = detector.AABB(lizBox, blobBox);
+  gfx.lineStyle(1, 0xff0000, 1);
+  for (var i = 0; i < collisionIndecies.length; i++) {
+    let collisionIndex = collisionIndecies[i];
+    let curBox1 = lizBox[collisionIndex[0]];
+    gfx.moveTo(curBox1[0].x, curBox1[0].y);
+    gfx.lineTo(curBox1[1].x, curBox1[0].y);
+    gfx.lineTo(curBox1[1].x, curBox1[1].y);
+    gfx.lineTo(curBox1[0].x, curBox1[1].y);
+    gfx.lineTo(curBox1[0].x, curBox1[0].y);
+
+    let curBox2 = blobBox[collisionIndex[1]];
+    gfx.moveTo(curBox2[0].x, curBox2[0].y);
+    gfx.lineTo(curBox2[1].x, curBox2[0].y);
+    gfx.lineTo(curBox2[1].x, curBox2[1].y);
+    gfx.lineTo(curBox2[0].x, curBox2[1].y);
+    gfx.lineTo(curBox2[0].x, curBox2[0].y);
+  }
   gfx.stroke();
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",

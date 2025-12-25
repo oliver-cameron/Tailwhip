@@ -1,12 +1,18 @@
 <!doctype html>
-<html lang="en">
+<html>
     <head>
-        <link rel="stylesheet" href="index.css" />
+        <!--<script src="pixi.min.js"></script>
+        <script src="scriptsProd/geo.js" type="module"></script>
+        <script src="scriptsProd/render.js" type="module"></script>-->
         <script src="pixi.min.js"></script>
-        <script src="lizardOld.js" type="module"></script>
+        <script src="geo.js" type="module"></script>
+        <script src="render.js" type="module"></script>
+        <script src="lizard.js" type="module"></script>
+        <script src="newRender.js" type="module"></script>
     </head>
     <body>
         <div id="graphics"></div>
-        <button class="button" id="play" onclick="play()">Play</button>
+        <!-- gl graphics context -->
+        <canvas id="gcx"></canvas>
     </body>
 </html>
