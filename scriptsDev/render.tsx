@@ -1,5 +1,5 @@
 import { lizardCharacters } from "./lizard";
-import { Point } from "./geo";
+import { Curve, Point } from "./geo";
 import { Spine, updateSpine } from "./newSpine";
 import { detector } from "./collide";
 var app = new PIXI.Application();
@@ -32,18 +32,24 @@ window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
 let blob = detector.blobloop;
-function drawKSplineSegment(p0, p1, p2, p3) {
+function drawBSplineSegment(p0, p1, p2, p3) {
   // Convert to Bézier control points
-  let b0 = p1;
+  let b0 = {
+    x: (p0.x + 4 * p1.x + p2.x) / 6,
+    y: (p0.y + 4 * p1.y + p2.y) / 6
+  };
   let b1 = {
-    x: p1.x - 0.25 * p0.x + 0.25 * p2.x,
-    y: p1.y - 0.25 * p0.y + 0.25 * p2.y,
+    x: (2 * p1.x + p2.x) / 3,
+    y: (2 * p1.y + p2.y) / 3,
   };
   let b2 = {
-    x: 0.25 * p1.x + p2.x - 0.25 * p3.x,
-    y: 0.25 * p1.y + p2.y - 0.25 * p3.y,
+    x: (p1.x + 2 * p2.x) / 3,
+    y: (p1.y + 2 * p2.y) / 3,
   };
-  let b3 = p2;
+  let b3 = {
+    x: (p1.x + 4 * p2.x + p3.x) / 6,
+    y: (p1.y + 4 * p2.y + p3.y) / 6,
+  };
   gfx.moveTo(b0.x, b0.y);
   gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
 }
@@ -78,9 +84,8 @@ app.ticker.add((delta) => {
   // lizardCharacters.draw(lizardCharacters.myCharacter, gfx);
   let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
   gfx.lineStyle(2, 0x0000ff, 1);
-  gfx.moveTo(outline[0].x, outline[0].y);
   for (var i = 0; i < outline.length; i++) {
-    drawKSplineSegment(
+    drawBSplineSegment(
       outline[(i - 1 + outline.length) % outline.length],
       outline[i],
       outline[(i + 1) % outline.length],
@@ -91,9 +96,9 @@ app.ticker.add((delta) => {
   gfx.stroke();
   // Draw Blob
   gfx.lineStyle(2, 0x00ff00, 1);
-  gfx.moveTo(blob[1].x, blob[1].y);
+  gfx.moveTo(blob[2].x, blob[2].y);
   for (var i = 0; i < blob.length; i++) {
-    drawKSplineSegment(
+    drawBSplineSegment(
       blob[i],
       blob[(i + 1) % blob.length],
       blob[(i + 2) % blob.length],
@@ -161,3 +166,9 @@ app.ticker.add((delta) => {
   gfx.closePath();
   gfx.stroke();
 });
+
+// TEST HYBCLIP
+let C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
+let C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));
+console.log("HI")
+console.log(detector.refineHybclip(C1,C2,[0,1],[0,1]))

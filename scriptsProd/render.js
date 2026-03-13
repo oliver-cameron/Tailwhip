@@ -52,6 +52,9 @@ class Curve {
   static fromKSpline(p0, p1, p2, p3) {
     return new Curve(p1, p1.subtract(p0.scale(0.25)).add(p2.scale(0.25)), p2.subtract(p3.scale(0.25)).add(p1.scale(0.25)), p2);
   }
+  static fromBSpline(p0, p1, p2, p3) {
+    return new Curve(new Point((p0.x + 4 * p1.x + p2.x) / 6, (p0.y + 4 * p1.y + p2.y) / 6), new Point((2 * p1.x + p2.x) / 3, (2 * p1.y + p2.y) / 3), new Point((p1.x + 2 * p2.x) / 3, (p1.y + 2 * p2.y) / 3), new Point((p1.x + 4 * p2.x + p3.x) / 6, (p1.y + 4 * p2.y + p3.y) / 6));
+  }
   coeff() {
     return {
       t3: this.p0.scale(-1).add(this.p1.scale(3)).add(this.p2.scale(-3)).add(this.p3.scale(1)),
@@ -212,7 +215,7 @@ var lizardCharacters = {
     }
   ],
   myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
-    { index: 5, offset: new Point(0, 4) },
+    { index: 5, offset: new Point(50, 4) },
     { index: 4, offset: new Point(0, 7) },
     { index: 3, offset: new Point(0, 10) },
     { index: 2, offset: new Point(-15, 20) },
@@ -564,7 +567,7 @@ class detector {
     let count = inputKString.length;
     let curves = [];
     for (var i2 = 0;i2 < count; i2++) {
-      curves.push(Curve.fromKSpline(inputKString[i2], inputKString[(i2 + 1) % count], inputKString[(i2 + 2) % count], inputKString[(i2 + 3) % count]));
+      curves.push(Curve.fromBSpline(inputKString[i2], inputKString[(i2 + 1) % count], inputKString[(i2 + 2) % count], inputKString[(i2 + 3) % count]));
     }
     return curves.map((o) => o.boundingBox()).map((o) => [o.lowest, o.highest]);
   }
@@ -580,6 +583,74 @@ class detector {
       }
     }
     return returnIndecies;
+  }
+  static quadFormula(a, b, c) {
+    if (a === 0) {
+      if (b === 0) {
+        return [];
+      }
+      return [-c / b];
+    }
+    let base = -b / (2 * a);
+    let diff = Math.sqrt(b ** 2 - 4 * a * c) / (2 * a);
+    if (Number.isNaN(diff)) {
+      return [];
+    }
+    return [base + diff, base - diff];
+  }
+  static refineHybclip(curve1, curve2, i1, i2) {
+    let curve1coeff = curve1.coeff();
+    let FE1 = curve1.value(curve1coeff, i1[0]);
+    let FE2 = curve1.value(curve1coeff, i1[1]);
+    let vec = FE2.subtract(FE1);
+    let norm = new Point(-vec.y, vec.x);
+    let c1dir = curve1.coeff1Dir();
+    let dirFlat = { t2: c1dir.t2.dotProduct(norm), t1: c1dir.t1.dotProduct(norm), t0: c1dir.t0.dotProduct(norm) };
+    let intersections = this.quadFormula(dirFlat.t2, dirFlat.t1, dirFlat.t0);
+    let dists = intersections.filter((o) => o > i1[0] && o < i1[1]).map((o) => curve1.value(curve1coeff, o).dotProduct(norm)).concat([FE1.dotProduct(norm), FE2.dotProduct(norm)]);
+    let maxDist = Math.max(...dists);
+    let minDist = Math.min(...dists);
+    let curve2coeff = curve2.coeff();
+    let e0 = [i2[0] * i2[0] * i2[1], i2[0] * i2[1] * i2[1]];
+    let e1 = [i2[0] * i2[0], i2[1] * i2[1]].map((o) => -2 * i2[0] * i2[1] - o);
+    let e2 = [i2[0] * 2 + i2[1], i2[0] + i2[1] * 2];
+    let flattenedCurve = { t0: curve2coeff.t0.dotProduct(norm), t1: curve2coeff.t1.dotProduct(norm), t2: curve2coeff.t2.dotProduct(norm), t3: curve2coeff.t3.dotProduct(norm) };
+    let upLine = { t0: flattenedCurve.t0 + e0[0] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[0] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[0] * flattenedCurve.t3 };
+    let downLine = { t0: flattenedCurve.t0 + e0[1] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[1] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[1] * flattenedCurve.t3 };
+    let upIntersect1 = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - maxDist).map((o) => ({ t: o, ingress: upLine.t1 + 2 * upLine.t2 * o < 0 }));
+    let downIntersect1 = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - maxDist).map((o) => ({ t: o, ingress: downLine.t1 + 2 * downLine.t2 * o < 0 }));
+    let upIntersect2 = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - minDist).map((o) => ({ t: o, ingress: upLine.t1 + 2 * upLine.t2 * o > 0 }));
+    let downIntersect2 = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - minDist).map((o) => ({ t: o, ingress: downLine.t1 + 2 * downLine.t2 * o > 0 }));
+    let upCandidates = upIntersect1.concat(upIntersect2).filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let downCandidates = downIntersect1.concat(downIntersect2).filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let upStart = upLine.t0 + upLine.t1 * i2[0] + upLine.t2 * i2[0] ** 2;
+    let downStart = downLine.t0 + downLine.t1 * i2[0] + downLine.t2 * i2[0] ** 2;
+    let countStart = (upStart > minDist && upStart < maxDist ? 0 : 1) + (downStart > minDist && downStart < maxDist ? 0 : 1);
+    let candidates = upCandidates.concat(downCandidates).sort((a, b) => a.t - b.t);
+    let endPoints = [];
+    if (countStart < 2) {
+      endPoints.push(i2[0]);
+    }
+    console.log(countStart);
+    console.log(candidates);
+    var count = countStart;
+    for (var i3 = 0;i3 < candidates.length; i3++) {
+      if (candidates[i3].ingress) {
+        count--;
+        if (count == 1) {
+          endPoints.push(candidates[i3].t);
+        }
+      } else {
+        count++;
+        if (count == 2) {
+          endPoints.push(candidates[i3].t);
+        }
+      }
+    }
+    if (count < 2) {
+      endPoints.push(i2[1]);
+    }
+    return endPoints;
   }
 }
 var collide_default = { detector };
@@ -608,17 +679,23 @@ window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
 var blob = detector.blobloop;
-function drawKSplineSegment(p0, p1, p2, p3) {
-  let b0 = p1;
+function drawBSplineSegment(p0, p1, p2, p3) {
+  let b0 = {
+    x: (p0.x + 4 * p1.x + p2.x) / 6,
+    y: (p0.y + 4 * p1.y + p2.y) / 6
+  };
   let b1 = {
-    x: p1.x - 0.25 * p0.x + 0.25 * p2.x,
-    y: p1.y - 0.25 * p0.y + 0.25 * p2.y
+    x: (2 * p1.x + p2.x) / 3,
+    y: (2 * p1.y + p2.y) / 3
   };
   let b2 = {
-    x: 0.25 * p1.x + p2.x - 0.25 * p3.x,
-    y: 0.25 * p1.y + p2.y - 0.25 * p3.y
+    x: (p1.x + 2 * p2.x) / 3,
+    y: (p1.y + 2 * p2.y) / 3
   };
-  let b3 = p2;
+  let b3 = {
+    x: (p1.x + 4 * p2.x + p3.x) / 6,
+    y: (p1.y + 4 * p2.y + p3.y) / 6
+  };
   gfx.moveTo(b0.x, b0.y);
   gfx.bezierCurveTo(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y);
 }
@@ -648,16 +725,15 @@ app.ticker.add((delta) => {
   lizardCharacters.myCharacter.spine = testSpine.points;
   let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
   gfx.lineStyle(2, 255, 1);
-  gfx.moveTo(outline[0].x, outline[0].y);
   for (var i2 = 0;i2 < outline.length; i2++) {
-    drawKSplineSegment(outline[(i2 - 1 + outline.length) % outline.length], outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length]);
+    drawBSplineSegment(outline[(i2 - 1 + outline.length) % outline.length], outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length]);
   }
   gfx.closePath();
   gfx.stroke();
   gfx.lineStyle(2, 65280, 1);
-  gfx.moveTo(blob[1].x, blob[1].y);
+  gfx.moveTo(blob[2].x, blob[2].y);
   for (var i2 = 0;i2 < blob.length; i2++) {
-    drawKSplineSegment(blob[i2], blob[(i2 + 1) % blob.length], blob[(i2 + 2) % blob.length], blob[(i2 + 3) % blob.length]);
+    drawBSplineSegment(blob[i2], blob[(i2 + 1) % blob.length], blob[(i2 + 2) % blob.length], blob[(i2 + 3) % blob.length]);
   }
   gfx.stroke();
   let lizBox = detector.getCurveBoundingBoxes(outline);
@@ -712,3 +788,7 @@ app.ticker.add((delta) => {
   gfx.closePath();
   gfx.stroke();
 });
+var C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
+var C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));
+console.log("HI");
+console.log(detector.refineHybclip(C1, C2, [0, 1], [0, 1]));

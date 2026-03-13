@@ -85,7 +85,7 @@ export var lizardCharacters = {
       .map(() => new Point(Math.random() + 100, Math.random() + 100)),
     Lizard.dub(
     [
-      { index: 5, offset: new Point(0, 4) },
+      { index: 5, offset: new Point(50, 4) },
       { index: 4, offset: new Point(0, 7) },
       { index: 3, offset: new Point(0, 10) },
       { index: 2, offset: new Point(-15, 20) },
