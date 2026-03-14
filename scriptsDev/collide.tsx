@@ -14,16 +14,16 @@ export class detector {
     new Point(450, 550),
     new Point(450, 500),
   ];
-  static getCurveBoundingBoxes(inputKString: Point[]): [Point, Point][] {
-    let count = inputKString.length;
+  static getCurveBoundingBoxes(inputBString: Point[]): [Point, Point][] {
+    let count = inputBString.length;
     let curves: Curve[] = [] as Curve[];
     for (var i = 0; i < count; i++) {
       curves.push(
         Curve.fromBSpline(
-          inputKString[i],
-          inputKString[(i + 1) % count],
-          inputKString[(i + 2) % count],
-          inputKString[(i + 3) % count],
+          inputBString[i],
+          inputBString[(i + 1) % count],
+          inputBString[(i + 2) % count],
+          inputBString[(i + 3) % count],
         ),
       );
     }
@@ -51,11 +51,11 @@ export class detector {
     return returnIndecies;
   }
   static quadFormula(a: number, b: number, c: number): number[] {
-    if(a === 0){
-      if(b === 0){
+    if (a === 0) {
+      if (b === 0) {
         return [];
       }
-      return [-c/b];
+      return [-c / b];
     }
     let base = -b / (2 * a);
     let diff = Math.sqrt(b ** 2 - 4 * a * c) / (2 * a);
@@ -69,72 +69,173 @@ export class detector {
     curve2: Curve,
     i1: [number, number],
     i2: [number, number],
-  ){
+  ): [number, number][] {
     // 1. Get fat line
     let curve1coeff = curve1.coeff();
     let FE1 = curve1.value(curve1coeff, i1[0]);
     let FE2 = curve1.value(curve1coeff, i1[1]);
     let vec = FE2.subtract(FE1);
     let norm = new Point(-vec.y, vec.x);
-    let c1dir = curve1.coeff1Dir()
-    let dirFlat = {t2: c1dir.t2.dotProduct(norm), t1: c1dir.t1.dotProduct(norm), t0: c1dir.t0.dotProduct(norm)}
-    let intersections = this.quadFormula(dirFlat.t2, dirFlat.t1, dirFlat.t0)
-    let dists = intersections.filter(o => o > i1[0] && o < i1[1]).map(o => curve1.value(curve1coeff, o).dotProduct(norm)).concat([FE1.dotProduct(norm), FE2.dotProduct(norm)]);
+    let c1dir = curve1.coeff1Dir();
+    let dirFlat = {
+      t2: c1dir.t2.dotProduct(norm),
+      t1: c1dir.t1.dotProduct(norm),
+      t0: c1dir.t0.dotProduct(norm),
+    };
+    let intersections = this.quadFormula(dirFlat.t2, dirFlat.t1, dirFlat.t0);
+    let dists = intersections
+      .filter((o) => o > i1[0] && o < i1[1])
+      .map((o) => curve1.value(curve1coeff, o).dotProduct(norm))
+      .concat([FE1.dotProduct(norm), FE2.dotProduct(norm)]);
     let maxDist = Math.max(...dists);
     let minDist = Math.min(...dists);
     // 2. Get implicit line of curve2
-    let curve2coeff = curve2.coeff()
-    let e0 = [i2[0] * i2[0] * i2[1], i2[0] * i2[1] * i2[1]]
-    let e1 = [i2[0] * i2[0], i2[1] * i2[1]].map((o) => -2 * i2[0] * i2[1] - o );
-    let e2 = [i2[0] * 2 + i2[1], i2[0] + i2[1] * 2]
-    let flattenedCurve = {t0: curve2coeff.t0.dotProduct(norm), t1: curve2coeff.t1.dotProduct(norm), t2: curve2coeff.t2.dotProduct(norm), t3: curve2coeff.t3.dotProduct(norm)}
-    let upLine = {t0: flattenedCurve.t0 + e0[0] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[0] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[0] * flattenedCurve.t3}
-    let downLine = {t0: flattenedCurve.t0 + e0[1] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[1] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[1] * flattenedCurve.t3}
+    let curve2coeff = curve2.coeff();
+    let e0 = [i2[0] * i2[0] * i2[1], i2[0] * i2[1] * i2[1]];
+    let e1 = [i2[0] * i2[0], i2[1] * i2[1]].map((o) => -2 * i2[0] * i2[1] - o);
+    let e2 = [i2[0] * 2 + i2[1], i2[0] + i2[1] * 2];
+    let flattenedCurve = {
+      t0: curve2coeff.t0.dotProduct(norm),
+      t1: curve2coeff.t1.dotProduct(norm),
+      t2: curve2coeff.t2.dotProduct(norm),
+      t3: curve2coeff.t3.dotProduct(norm),
+    };
+    let upLine = {
+      t0: flattenedCurve.t0 + e0[0] * flattenedCurve.t3,
+      t1: flattenedCurve.t1 + e1[0] * flattenedCurve.t3,
+      t2: flattenedCurve.t2 + e2[0] * flattenedCurve.t3,
+    };
+    let downLine = {
+      t0: flattenedCurve.t0 + e0[1] * flattenedCurve.t3,
+      t1: flattenedCurve.t1 + e1[1] * flattenedCurve.t3,
+      t2: flattenedCurve.t2 + e2[1] * flattenedCurve.t3,
+    };
     // 3. Get intersection of implicit line with fat line
-    let upIntersect1: {t: number, ingress: boolean}[] = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - maxDist).map(o => ({t: o, ingress: upLine.t1 + 2 * upLine.t2 * o < 0}));
-    let downIntersect1: {t: number, ingress: boolean}[] = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - maxDist).map(o => ({t: o, ingress: downLine.t1 + 2 * downLine.t2 * o < 0}));
-    let upIntersect2: {t: number, ingress: boolean}[] = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - minDist).map(o => ({t: o, ingress: upLine.t1 + 2 * upLine.t2 * o > 0}));
-    let downIntersect2: {t: number, ingress: boolean}[] = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - minDist).map(o => ({t: o, ingress: downLine.t1 + 2 * downLine.t2 * o > 0}));
-    let upCandidates: {t: number, ingress: boolean}[] = upIntersect1.concat(upIntersect2).filter(o => o.t > i2[0] && o.t < i2[1])
-    let downCandidates: {t: number, ingress: boolean}[] = downIntersect1.concat(downIntersect2).filter(o => o.t > i2[0] && o.t < i2[1])
-    let upStart = upLine.t0 + upLine.t1 * i2[0] + upLine.t2 * i2[0] ** 2
-    let downStart = downLine.t0 + downLine.t1 * i2[0] + downLine.t2 * i2[0] ** 2
-    let countStart = ((upStart > minDist && upStart < maxDist) ? 0 : 1) + ((downStart > minDist && downStart < maxDist) ? 0 : 1)
-    let candidates = upCandidates.concat(downCandidates).sort((a, b) => a.t - b.t);
-    let endPoints: number[] = []
-    if(countStart < 2){
+    // Ingress:
+    // Going to above max: 1
+    // Going to between min and max: 0
+    // Going to below min: -1
+    // Line: true for up, false for down
+    let upIntersect1: { t: number; ingress: number; line: boolean }[] =
+      this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - maxDist).map((o) => ({
+        t: o,
+        ingress: upLine.t1 + 2 * upLine.t2 * o < 0 ? 0 : 1,
+        line: true,
+      }));
+    let downIntersect1: { t: number; ingress: number; line: boolean }[] =
+      this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - maxDist).map(
+        (o) => ({
+          t: o,
+          ingress: upLine.t1 + 2 * upLine.t2 * o < 0 ? 0 : 1,
+          line: false,
+        }),
+      );
+    let upIntersect2: { t: number; ingress: number; line: boolean }[] =
+      this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - minDist).map((o) => ({
+        t: o,
+        ingress: upLine.t1 + 2 * upLine.t2 * o > 0 ? 0 : -1,
+        line: true,
+      }));
+    let downIntersect2: { t: number; ingress: number; line: boolean }[] =
+      this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - minDist).map(
+        (o) => ({
+          t: o,
+          ingress: downLine.t1 + 2 * downLine.t2 * o > 0 ? 0 : -1,
+          line: false,
+        }),
+      );
+    let upCandidates: { t: number; ingress: number; line: boolean }[] =
+      upIntersect1
+        .concat(upIntersect2)
+        .filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let downCandidates: { t: number; ingress: number; line: boolean }[] =
+      downIntersect1
+        .concat(downIntersect2)
+        .filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let upStart = upLine.t0 + upLine.t1 * i2[0] + upLine.t2 * i2[0] ** 2;
+    var upCount: number = upStart > minDist ? (upStart < maxDist ? 0 : 1) : -1;
+    let downStart =
+      downLine.t0 + downLine.t1 * i2[0] + downLine.t2 * i2[0] ** 2;
+    var downCount: number =
+      downStart > minDist ? (downStart < maxDist ? 0 : 1) : -1;
+    let candidates = upCandidates
+      .concat(downCandidates)
+      .sort((a, b) => a.t - b.t);
+    let endPoints: number[] = [];
+    if (Math.abs(upCount + downCount) < 2) {
       endPoints.push(i2[0]);
     }
-    console.log(countStart)
-    console.log(candidates)  
-    var count = countStart;
-    for(var i = 0; i < candidates.length; i++){
-      if(candidates[i].ingress){
-        count--;
-        if(count == 1){
-          endPoints.push(candidates[i].t);
-        }
+    for (var i = 0; i < candidates.length; i++) {
+      let prevCount = upCount + downCount;
+      if (candidates[i].line) {
+        upCount = candidates[i].ingress;
       } else {
-        count++;
-        if(count == 2){
-          endPoints.push(candidates[i].t);
-        }
+        downCount = candidates[i].ingress;
+      }
+      if (Math.abs(upCount + downCount) < 2 != Math.abs(prevCount) < 2) {
+        endPoints.push(candidates[i].t);
       }
     }
-    if(count < 2){
-      endPoints.push(i2[1]);
+    if (Math.abs(upCount + downCount) < 2) {
+      endPoints.push(i2[0]);
     }
     var result: [number, number][] = [];
-    for(var i = 0; i < endPoints.length; i+= 2){
-      result.push([endPoints[i], endPoints[i+1]]);
+    for (var i = 0; i < endPoints.length; i += 2) {
+      result.push([endPoints[i], endPoints[i + 1]]);
     }
-    if(result.length == 1){
-      if(result[0][1] - result[0][0] > 0.8 * (i2[1] - i2[0])){
+    if (result.length == 1) {
+      if (result[0][1] - result[0][0] > 0.8 * (i2[1] - i2[0])) {
         let mp = (result[0][0] + result[0][1]) / 2;
-        return [[result[0][0], mp],[mp, result[0][1]]];
+        return [
+          [result[0][0], mp],
+          [mp, result[0][1]],
+        ];
       }
     }
     return result;
+  }
+  static solveCollision(
+    curve1: Curve,
+    curve2: Curve,
+    i1: [number, number] = [0, 1],
+    i2: [number, number] = [0, 1],
+    depth: number = 5,
+  ): { i1: [number, number]; i2: [number, number] }[] {
+    if (depth == 0) {
+      return [{ i1: i1, i2: i2 }];
+    }
+    let returner = [] as {
+      i1: [number, number];
+      i2: [number, number];
+    }[];
+    if (depth % 2 == 0) {
+      let refined = this.refineHybclip(curve2, curve1, i2, i1);
+      console.log(depth);
+      for (var i = 0; i < refined.length; i++) {
+        let subResult = this.solveCollision(
+          curve1,
+          curve2,
+          refined[i],
+          i2,
+          depth - 1,
+        );
+        returner = returner.concat(subResult);
+      }
+    } else {
+      let refined = this.refineHybclip(curve1, curve2, i1, i2);
+      console.log(depth);
+      for (var i = 0; i < refined.length; i++) {
+        let subResult = this.solveCollision(
+          curve1,
+          curve2,
+          i1,
+          refined[i],
+          depth - 1,
+        );
+        returner = returner.concat(subResult);
+      }
+    }
+    return returner;
   }
 }
 export default { detector };

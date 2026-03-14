@@ -36,7 +36,7 @@ function drawBSplineSegment(p0, p1, p2, p3) {
   // Convert to Bézier control points
   let b0 = {
     x: (p0.x + 4 * p1.x + p2.x) / 6,
-    y: (p0.y + 4 * p1.y + p2.y) / 6
+    y: (p0.y + 4 * p1.y + p2.y) / 6,
   };
   let b1 = {
     x: (2 * p1.x + p2.x) / 3,
@@ -154,6 +154,32 @@ app.ticker.add((delta) => {
     gfx.lineTo(curBox2[0].x, curBox2[0].y);
   }
   gfx.stroke();
+  // Now, draw circles at collision points. Only need to draw circles for lizard, as they are collisions and should be the same points on the blob
+  // But good to check anyway
+  for (var i = 0; i < collisionIndecies.length; i++) {
+    let collisionIndex = collisionIndecies[i];
+    let curve1 = Curve.fromBSpline(
+      outline[collisionIndex[0]],
+      outline[(collisionIndex[0] + 1) % outline.length],
+      outline[(collisionIndex[0] + 2) % outline.length],
+      outline[(collisionIndex[0] + 3) % outline.length],
+    );
+    let curve2 = Curve.fromBSpline(
+      blob[collisionIndex[1]],
+      blob[(collisionIndex[1] + 1) % blob.length],
+      blob[(collisionIndex[1] + 2) % blob.length],
+      blob[(collisionIndex[1] + 3) % blob.length],
+    );
+    let collisionPoints = detector.solveCollision(curve1, curve2);
+    console.log(collisionPoints);
+    for (var j = 0; j < collisionPoints.length; j++) {
+      let collisionT = collisionPoints[j];
+      let collisionPoint = curve1.value(curve1.coeff(), collisionT.i1[0]);
+      gfx.beginFill(0xffaa44, 1);
+      gfx.drawCircle(collisionPoint.x, collisionPoint.y, 5);
+      gfx.endFill();
+    }
+  }
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",
     "walk",
@@ -167,8 +193,17 @@ app.ticker.add((delta) => {
   gfx.stroke();
 });
 
-// TEST HYBCLIP
-let C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
-let C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));
-console.log("HI")
-console.log(detector.refineHybclip(C1,C2,[0,1],[0,1]))
+let C1 = new Curve(
+  new Point(1, -1),
+  new Point(0.7, -0.7),
+  new Point(0.2, -0.7),
+  new Point(0, -1),
+);
+let C2 = new Curve(
+  new Point(0.2, -0.4),
+  new Point(0.3, -1.4),
+  new Point(0.7, -1.3),
+  new Point(0.9, -0.4),
+);
+console.log("HI");
+console.log(detector.solveCollision(C1, C2));
