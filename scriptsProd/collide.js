@@ -52,6 +52,9 @@ class Curve {
   static fromKSpline(p0, p1, p2, p3) {
     return new Curve(p1, p1.subtract(p0.scale(0.25)).add(p2.scale(0.25)), p2.subtract(p3.scale(0.25)).add(p1.scale(0.25)), p2);
   }
+  static fromBSpline(p0, p1, p2, p3) {
+    return new Curve(new Point((p0.x + 4 * p1.x + p2.x) / 6, (p0.y + 4 * p1.y + p2.y) / 6), new Point((2 * p1.x + p2.x) / 3, (2 * p1.y + p2.y) / 3), new Point((p1.x + 2 * p2.x) / 3, (p1.y + 2 * p2.y) / 3), new Point((p1.x + 4 * p2.x + p3.x) / 6, (p1.y + 4 * p2.y + p3.y) / 6));
+  }
   coeff() {
     return {
       t3: this.p0.scale(-1).add(this.p1.scale(3)).add(this.p2.scale(-3)).add(this.p3.scale(1)),
@@ -176,7 +179,7 @@ class detector {
     let count = inputKString.length;
     let curves = [];
     for (var i = 0;i < count; i++) {
-      curves.push(Curve.fromKSpline(inputKString[i], inputKString[(i + 1) % count], inputKString[(i + 2) % count], inputKString[(i + 3) % count]));
+      curves.push(Curve.fromBSpline(inputKString[i], inputKString[(i + 1) % count], inputKString[(i + 2) % count], inputKString[(i + 3) % count]));
     }
     return curves.map((o) => o.boundingBox()).map((o) => [o.lowest, o.highest]);
   }
@@ -192,6 +195,74 @@ class detector {
       }
     }
     return returnIndecies;
+  }
+  static quadFormula(a, b, c) {
+    if (a === 0) {
+      if (b === 0) {
+        return [];
+      }
+      return [-c / b];
+    }
+    let base = -b / (2 * a);
+    let diff = Math.sqrt(b ** 2 - 4 * a * c) / (2 * a);
+    if (Number.isNaN(diff)) {
+      return [];
+    }
+    return [base + diff, base - diff];
+  }
+  static refineHybclip(curve1, curve2, i1, i2) {
+    let curve1coeff = curve1.coeff();
+    let FE1 = curve1.value(curve1coeff, i1[0]);
+    let FE2 = curve1.value(curve1coeff, i1[1]);
+    let vec = FE2.subtract(FE1);
+    let norm = new Point(-vec.y, vec.x);
+    let c1dir = curve1.coeff1Dir();
+    let dirFlat = { t2: c1dir.t2.dotProduct(norm), t1: c1dir.t1.dotProduct(norm), t0: c1dir.t0.dotProduct(norm) };
+    let intersections = this.quadFormula(dirFlat.t2, dirFlat.t1, dirFlat.t0);
+    let dists = intersections.filter((o) => o > i1[0] && o < i1[1]).map((o) => curve1.value(curve1coeff, o).dotProduct(norm)).concat([FE1.dotProduct(norm), FE2.dotProduct(norm)]);
+    let maxDist = Math.max(...dists);
+    let minDist = Math.min(...dists);
+    let curve2coeff = curve2.coeff();
+    let e0 = [i2[0] * i2[0] * i2[1], i2[0] * i2[1] * i2[1]];
+    let e1 = [i2[0] * i2[0], i2[1] * i2[1]].map((o) => -2 * i2[0] * i2[1] - o);
+    let e2 = [i2[0] * 2 + i2[1], i2[0] + i2[1] * 2];
+    let flattenedCurve = { t0: curve2coeff.t0.dotProduct(norm), t1: curve2coeff.t1.dotProduct(norm), t2: curve2coeff.t2.dotProduct(norm), t3: curve2coeff.t3.dotProduct(norm) };
+    let upLine = { t0: flattenedCurve.t0 + e0[0] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[0] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[0] * flattenedCurve.t3 };
+    let downLine = { t0: flattenedCurve.t0 + e0[1] * flattenedCurve.t3, t1: flattenedCurve.t1 + e1[1] * flattenedCurve.t3, t2: flattenedCurve.t2 + e2[1] * flattenedCurve.t3 };
+    let upIntersect1 = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - maxDist).map((o) => ({ t: o, ingress: upLine.t1 + 2 * upLine.t2 * o < 0 }));
+    let downIntersect1 = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - maxDist).map((o) => ({ t: o, ingress: downLine.t1 + 2 * downLine.t2 * o < 0 }));
+    let upIntersect2 = this.quadFormula(upLine.t2, upLine.t1, upLine.t0 - minDist).map((o) => ({ t: o, ingress: upLine.t1 + 2 * upLine.t2 * o > 0 }));
+    let downIntersect2 = this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - minDist).map((o) => ({ t: o, ingress: downLine.t1 + 2 * downLine.t2 * o > 0 }));
+    let upCandidates = upIntersect1.concat(upIntersect2).filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let downCandidates = downIntersect1.concat(downIntersect2).filter((o) => o.t > i2[0] && o.t < i2[1]);
+    let upStart = upLine.t0 + upLine.t1 * i2[0] + upLine.t2 * i2[0] ** 2;
+    let downStart = downLine.t0 + downLine.t1 * i2[0] + downLine.t2 * i2[0] ** 2;
+    let countStart = (upStart > minDist && upStart < maxDist ? 0 : 1) + (downStart > minDist && downStart < maxDist ? 0 : 1);
+    let candidates = upCandidates.concat(downCandidates).sort((a, b) => a.t - b.t);
+    let endPoints = [];
+    if (countStart < 2) {
+      endPoints.push(i2[0]);
+    }
+    console.log(countStart);
+    console.log(candidates);
+    var count = countStart;
+    for (var i = 0;i < candidates.length; i++) {
+      if (candidates[i].ingress) {
+        count--;
+        if (count == 1) {
+          endPoints.push(candidates[i].t);
+        }
+      } else {
+        count++;
+        if (count == 2) {
+          endPoints.push(candidates[i].t);
+        }
+      }
+    }
+    if (count < 2) {
+      endPoints.push(i2[1]);
+    }
+    return endPoints;
   }
 }
 var collide_default = { detector };

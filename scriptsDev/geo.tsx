@@ -58,6 +58,14 @@ export class Curve {
       p2,
     );
   }
+  static fromBSpline(p0: Point, p1: Point, p2: Point, p3: Point): Curve {
+    return new Curve(
+      new Point((p0.x + 4 * p1.x + p2.x) / 6, (p0.y + 4 * p1.y + p2.y) / 6),
+      new Point((2 * p1.x + p2.x) / 3, (2 * p1.y + p2.y) / 3),
+      new Point((p1.x + 2 * p2.x) / 3, (p1.y + 2 * p2.y) / 3),
+      new Point((p1.x + 4 * p2.x + p3.x) / 6, (p1.y + 4 * p2.y + p3.y) / 6),
+    );
+  }
   // Coefficients
   coeff(): { t3: Point; t2: Point; t1: Point; t0: Point } {
     return {
