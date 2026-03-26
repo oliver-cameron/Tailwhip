@@ -30,7 +30,7 @@ export function updateSpine(
   return spine;
 }
 
-function multiplyMatrices(lhs: number[][], rhs: number[][]): number[][] {
+export function multiplyMatrices(lhs: number[][], rhs: number[][]): number[][] {
   // A row is an array of numbers
   // Check dimensions
   let lhsHeight = lhs[0].length;
@@ -203,6 +203,45 @@ function krylovApproximation(
   )[0].map((val) => val * startNorm);
   return result;
 }
+export function InvertMatrix(matrix: number[][]): number[][]{
+  // Check matrix is square  
+  let n = matrix.length
+  for(var i = 0; i < n; i++){
+    if(matrix[i].length != n){
+      throw new Error("Matrix is not square")
+    }
+  }
+  let L: number[][] = Array.from({ length: n }, () => Array(n).fill(0)).map(
+    (row, i) => row.map((val, j) => (i === j ? 1 : 0)),
+  );
+  // Down pass  
+  for(var i = 0; i < n; i++){
+    for(var j=i+1; j < n; j++){
+      let scale = matrix[j][i] / matrix[i][i]
+      for(var k = 0; k < n; k++){
+        matrix[j][k] -= scale * matrix[i][k]
+        L[j][k] -= scale * L[i][k]
+      }
+    }
+  }
+  // Up Pass
+  for(var i = n-1; i >=0; i--){
+    for(var j = n-1; j > i; j--){
+      let scale = matrix[j][i] / matrix[i][i]
+      for(var k = 0; k < n; k++){
+        matrix[j][k] -= scale * matrix[i][k]
+        L[j][k] -= scale * L[i][k]
+      }
+    }
+  }
+  // Through Pass
+  for(var i = 0; i < n; i++){
+    for(var j = 0; j < n; j++){
+      L[i][j] /= matrix[i][i] 
+    }
+  }
+  return L
+}
 function KAIteration(
   // M: iteration number
   // B is square matrix. Q is result matrix, with same height, and width = m + 1.
@@ -335,7 +374,7 @@ function bodySprings(spinePosition: Point[]): { F: number[][]; V: number[] } {
     let S: Point = coeffs
       .map((o, index) => spinePosition[index].scale(o))
       .reduce((a, b) => a.add(b));
-    let invSlen = 1 / S.length();
+    let invSlen = 1 / S.length;
     let sLenNeg3 = invSlen ** 3;
     // tslen = T / |s|
     let tslen = targetLength * invSlen;
@@ -438,3 +477,10 @@ function padeNextFrame(
   }
   return { spinePosition: pos, spineVel: vel };
 }
+console.log(InvertMatrix([
+  [1,0, 0,0],
+  [-3, 3, 0, 0],
+  [3, -6, 3, 0],
+  [-1, 3, -3, 1]
+]
+))

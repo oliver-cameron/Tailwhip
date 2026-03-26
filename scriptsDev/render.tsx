@@ -193,17 +193,3 @@ app.ticker.add((delta) => {
   gfx.stroke();
 });
 
-let C1 = new Curve(
-  new Point(1, -1),
-  new Point(0.7, -0.7),
-  new Point(0.2, -0.7),
-  new Point(0, -1),
-);
-let C2 = new Curve(
-  new Point(0.2, -0.4),
-  new Point(0.3, -1.4),
-  new Point(0.7, -1.3),
-  new Point(0.9, -0.4),
-);
-console.log("HI");
-console.log(detector.solveCollision(C1, C2));

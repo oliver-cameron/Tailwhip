@@ -1,4 +1,5 @@
 import { Point, Curve, other } from "./geo";
+import {InvertMatrix, multiplyMatricies } from "./newSpine.tsx"
 export class detector {
   static blobloop: Point[] = [
     new Point(500, 500),
@@ -237,5 +238,69 @@ export class detector {
     }
     return returner;
   }
+  static dir1TU(
+    curve1: Curve,
+    curve2: Curve,
+    t: Number,
+    u: Number,
+  ): Number[][][]{
+    // Top down return structure: (x,y), (p0, p1, p2, p3), (t,u)
+    let curve1Weights = [(1-t)**3, 3*(1-t)**2*t, 3*(1-t)*t**2, t**3]
+    let curve2Weights = [(1-u)**3, 3*(1-u)**2*u, 3*(1-u)*u**2, u**3]
+    let curve1dir = curve1.value(curve1.coeff1Dir, t)
+    let curve2dir = curve2.value(curve2.coeff2Dir, t)
+    let dirMat = [
+      [-curve1dir.x, curve2dir.x]
+      [-curve1dir.y, curve2dir.y]
+    ]
+    let revDir = InvertMatrix(dirMat)
+   
+  }
+  static dir1Force(
+    curve1: Curve,
+    curve2: Curve,
+    t: Number,
+    u: Number,
+  ){
+    let tc = curve1.coeff()
+    tc = [tc.t0, tc.t1, tc.t2, tc.t3]
+    let uc = curve2.coeff()
+    uc = [uc.t0, uc.t1, uc.t2, uc.t3]
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j) * t ** (i+j)))
+    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j) => o.map((p,i) => (j-i) * t ** (i+j - 1) * tc[i].x * tc[j].y)).flat().reduce((a,b) => a+b)
+    
+    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j) * u ** (i+j)))
+    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j) => o.map((p,i) => (j-i) * u ** (i+j - 1) * uc[i].x * uc[j].y)).flat().reduce((a,b) => a+b)
+    let c1dir = curve1.value(curve1.coeff1Dir(), t)
+    let c2dir = curve2.value(curve2.coeff1Dir(), t)
+    let curve1Weights = [(1-t)**3, 3*(1-t)**2*t, 3*(1-t)*t**2, t**3]
+    let curve2Weights = [(1-u)**3, 3*(1-u)**2*u, 3*(1-u)*u**2, u**3]
+    let dirMat = [
+      [-c1dir.x, c2dir.x],
+      [-c1dir.y, c2dir.y]
+    ]
+    let revDir = InvertMatrix(dirMat)
+    let xtcrut = tsd0.map((o, i) => o.map((p, index) => -tc[index].y * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] *  curve1Weights[i] ).reduce((a,b) => a+b))
+    let ytcrut = tsd0.map((o, i) => o.map((p, index) => tc[index].x * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] *   curve1Weights[i] ).reduce((a,b) => a+b))
+    let xucrut = tsd0.map((o, i) => o.map((p, index) => -uc[index].y * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * -curve1Weights[i] ).reduce((a,b) => a+b))
+    let yucrut = tsd0.map((o, i) => o.map((p, index) => uc[index].x * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve1Weights[i] ).reduce((a,b) => a+b))
+
+    return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)]
+  }
 }
+
+let C1 = new Curve(
+  new Point(1, -1),
+  new Point(0.7, -0.7),
+  new Point(0.2, -0.7),
+  new Point(0, -1),
+);
+let C2 = new Curve(
+  new Point(0.2, -0.4),
+  new Point(0.3, -1.4),
+  new Point(0.7, -1.3),
+  new Point(0.9, -0.4),
+);
+console.log("HI");
+console.log(detector.solveCollision(C1, C2))
 export default { detector };
