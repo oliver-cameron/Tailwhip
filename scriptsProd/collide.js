@@ -643,7 +643,12 @@ class detector {
     let yucrut = tsd0.map((o, i2) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * -curve1Weights[i2]).reduce((a, b) => a + b));
     return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)];
   }
+  static shrinkCurve(curve) {}
 }
+var C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
+var C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));
+console.log("HI");
+console.log(detector.solveCollision(C1, C2));
 var collide_default = { detector };
 export {
   detector,

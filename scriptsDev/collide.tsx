@@ -280,15 +280,21 @@ export class detector {
       [-c1dir.y, c2dir.y]
     ]
     let revDir = InvertMatrix(dirMat)
-    let xtcrut = tsd0.map((o, i) => o.map((p, index) => -arrTc[index].y * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] *  curve1Weights[i] ).reduce((a,b) => a+b))
-    let ytcrut = tsd0.map((o, i) => o.map((p, index) => arrTc[index].x * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] *   curve1Weights[i] ).reduce((a,b) => a+b))
-    let xucrut = tsd0.map((o, i) => o.map((p, index) => -arrUc[index].y * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * -curve1Weights[i] ).reduce((a,b) => a+b))
-    let yucrut = tsd0.map((o, i) => o.map((p, index) => arrUc[index].x * p).reduce((a,b) => a+b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve1Weights[i] ).reduce((a,b) => a+b))
+    let xtcrut = tsd0.map((o, i) => o.map((p, index) => -arrTc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] *  curve1Weights[i] ).reduce((a,b) => a+b))
+    let ytcrut = tsd0.map((o, i) => o.map((p, index) => arrTc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *   curve1Weights[i] ).reduce((a,b) => a+b))
+    let xucrut = tsd0.map((o, i) => o.map((p, index) => -arrUc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i] ).reduce((a,b) => a+b))
+    let yucrut = tsd0.map((o, i) => o.map((p, index) => arrUc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve2Weights[i] ).reduce((a,b) => a+b))
 
     return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)]
   }
   static shrinkCurve(curve: Curve):number[]{
-
+    
+    let tc = curve.coeff()
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3]
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j)))
+    let xtcrut = tsd0.map(o =>o.map((p, index: number) => p * -arrTc[index].y) )
+    let ytcrut = tsd0.map(o =>o.map((p, index: number) => p * arrTc[index].x) )
+    return xtcrut.concat(ytcrut)
   }
 }
 
