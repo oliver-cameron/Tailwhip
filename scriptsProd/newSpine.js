@@ -280,6 +280,39 @@ function padeApproximation(Matrix, order) {
   }
   return x;
 }
+function InvertMatrix(matrix) {
+  let n = matrix.length;
+  for (var i = 0;i < n; i++) {
+    if (matrix[i].length != n) {
+      throw new Error("Matrix is not square");
+    }
+  }
+  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0));
+  for (var i = 0;i < n; i++) {
+    for (var j = i + 1;j < n; j++) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = n - 1;i >= 0; i--) {
+    for (var j = n - 1;j > i; j--) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = 0;i < n; i++) {
+    for (var j = 0;j < n; j++) {
+      L[i][j] /= matrix[i][i];
+    }
+  }
+  return L;
+}
 var bodyLineLength = 50;
 var springForces = [
   {
@@ -410,7 +443,15 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   }
   return { spinePosition: pos, spineVel: vel };
 }
+console.log(InvertMatrix([
+  [1, 0, 0, 0],
+  [-3, 3, 0, 0],
+  [3, -6, 3, 0],
+  [-1, 3, -3, 1]
+]));
 export {
   updateSpine,
-  Spine
+  multiplyMatrices,
+  Spine,
+  InvertMatrix
 };

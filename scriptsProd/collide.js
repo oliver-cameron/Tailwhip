@@ -159,6 +159,297 @@ var other = {
 };
 var geo_default = { Point, Curve, other };
 
+// scriptsDev/newSpine.tsx
+class Spine {
+  points;
+  velocity;
+  constructor(points) {
+    this.points = points;
+    this.velocity = Array(points.length).fill(Point.zero);
+  }
+}
+function updateSpine(spine, headforce, deltaTime) {
+  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10);
+  spine.points = update.spinePosition;
+  spine.velocity = update.spineVel;
+  let avgVel = spine.velocity.reduce((a, b) => a.add(b)).scale(1 / spine.points.length);
+  return spine;
+}
+function multiplyMatrices(lhs, rhs) {
+  let lhsHeight = lhs[0].length;
+  for (var i = 0;i < lhs.length; i++) {
+    if (lhs[i].length != lhsHeight) {
+      throw new Error("LHS is not a valid matrix");
+    }
+  }
+  let rhsHeight = rhs[0].length;
+  for (var i = 0;i < rhs.length; i++) {
+    if (rhs[i].length != rhsHeight) {
+      throw new Error("RHS is not a valid matrix");
+    }
+  }
+  if (lhsHeight != rhs.length) {
+    throw new Error("Matrix dimensions do not match");
+  }
+  let returner = Array.from({ length: lhs.length }, () => Array(rhs[0].length).fill(0));
+  for (var i = 0;i < lhs.length; i++) {
+    for (var j = 0;j < rhs[0].length; j++) {
+      let sum = 0;
+      for (var k = 0;k < lhsHeight; k++) {
+        sum += lhs[i][k] * rhs[k][j];
+      }
+      returner[i][j] = sum;
+    }
+  }
+  return returner;
+}
+function LUDecompose(Matrix) {
+  let n = Matrix.length;
+  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i) => row.map((val, j) => i === j ? 1 : 0));
+  let U = multiplyMatrices(L, Matrix);
+  for (let i = 0;i < n; i++) {
+    for (let j = i + 1;j < n; j++) {
+      let div = U[j][i] / U[i][i];
+      L[j][i] = div;
+      for (let k = i;k < n; k++) {
+        U[j][k] -= div * U[i][k];
+      }
+    }
+  }
+  return { L, U };
+}
+function factorial(n) {
+  if (n % 1 !== 0) {
+    Error("Fractional factorial not implemented");
+  }
+  if (n < 0) {
+    Error("Negative factorial not defined");
+  } else if (n === 0 || n === 1) {
+    return 1;
+  } else {
+    return n * factorial(n - 1);
+  }
+}
+function matrixAddition(lhs, rhs) {
+  return lhs.map((row, i) => row.map((val, j) => val + rhs[i][j]));
+}
+function padeApproximation(Matrix, order) {
+  let size = Matrix.length;
+  for (var i = 0;i < size; i++) {
+    if (Matrix[i].length != size) {
+      throw new Error("Matrix is not square");
+    }
+  }
+  let absMat = Matrix.map((row) => row.map((x2) => Math.abs(x2)).reduce((a, b) => a + b)).reduce((a, b) => a > b ? a : b);
+  let scalar = absMat > 1 ? Math.ceil(Math.log2(absMat)) : 0;
+  let deltaMat = Matrix.map((row) => row.map((x2) => x2 / 2 ** scalar));
+  let powerCache = [
+    Array.from({ length: size }, () => Array(size).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0))
+  ];
+  let coefficients = [1];
+  for (let i2 = 1;i2 <= order; i2++) {
+    powerCache.push(multiplyMatrices(powerCache[i2 - 1], deltaMat));
+    coefficients.push(factorial(order * 2 - i2) * factorial(order) / (factorial(order * 2) * factorial(i2) * factorial(order - i2)));
+  }
+  let numerator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index]))).reduce((a, b) => matrixAddition(a, b));
+  let denominator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index] * (index % 2 === 0 ? 1 : -1)))).reduce((a, b) => matrixAddition(a, b));
+  let { L, U } = LUDecompose(denominator);
+  let x = Array.from({ length: size }, () => Array(size).fill(0));
+  for (var v = 0;v < size; v++) {
+    let y = Array(size).fill(0).map(() => 0);
+    for (var i = 0;i < size; i++) {
+      let sum = numerator[i][v];
+      if (i !== 0) {
+        for (var j = 0;j < i; j++) {
+          sum -= L[i][j] * y[j];
+        }
+      }
+      y[i] = sum / L[i][i];
+    }
+    for (var i = size - 1;i >= 0; i--) {
+      let sum = y[i];
+      for (var j = i + 1;j < size; j++) {
+        sum -= U[i][j] * x[j][v];
+      }
+      x[i][v] = sum / U[i][i];
+    }
+  }
+  for (var i = 0;i < scalar; i++) {
+    x = multiplyMatrices(x, x);
+  }
+  return x;
+}
+function InvertMatrix(matrix) {
+  let n = matrix.length;
+  for (var i = 0;i < n; i++) {
+    if (matrix[i].length != n) {
+      throw new Error("Matrix is not square");
+    }
+  }
+  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0));
+  for (var i = 0;i < n; i++) {
+    for (var j = i + 1;j < n; j++) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = n - 1;i >= 0; i--) {
+    for (var j = n - 1;j > i; j--) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = 0;i < n; i++) {
+    for (var j = 0;j < n; j++) {
+      L[i][j] /= matrix[i][i];
+    }
+  }
+  return L;
+}
+var bodyLineLength = 50;
+var springForces = [
+  {
+    coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
+    targetLength: bodyLineLength * 10 / 27,
+    stiffness: 50
+  },
+  {
+    coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
+    targetLength: bodyLineLength * 7 / 27,
+    stiffness: 50
+  },
+  {
+    coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
+    targetLength: bodyLineLength * 10 / 27,
+    stiffness: 50
+  }
+];
+var pointAmount = 6;
+var springData = [{ coefficients: [], targetLength: 0, stiffness: 0 }];
+for (i = 0;i < springForces.length; i++) {
+  for (j = 0;j < pointAmount - 3; j++) {
+    let coeffRow = Array(pointAmount).fill(0);
+    coeffRow.splice(j, 4, ...springForces[i].coefficients);
+    springData.push({
+      coefficients: coeffRow,
+      targetLength: springForces[i].targetLength,
+      stiffness: springForces[i].stiffness
+    });
+  }
+  let coeffRowStart = Array(pointAmount).fill(0);
+  let startCoeffs = [...springForces[i].coefficients];
+  startCoeffs[1] += startCoeffs[0] * 2;
+  startCoeffs[2] -= startCoeffs[0];
+  coeffRowStart.splice(0, 3, ...startCoeffs.slice(1));
+  springData.push({
+    coefficients: coeffRowStart,
+    targetLength: springForces[i].targetLength,
+    stiffness: springForces[i].stiffness
+  });
+  let coeffRowEnd = Array(pointAmount).fill(0);
+  let endCoeffs = [...springForces[i].coefficients];
+  endCoeffs[endCoeffs.length - 3] -= endCoeffs[endCoeffs.length - 1];
+  endCoeffs[endCoeffs.length - 2] += endCoeffs[endCoeffs.length - 1] * 2;
+  coeffRowEnd.splice(pointAmount - 3, 3, ...endCoeffs.slice(0, endCoeffs.length - 1));
+  springData.push({
+    coefficients: coeffRowEnd,
+    targetLength: springForces[i].targetLength,
+    stiffness: springForces[i].stiffness
+  });
+}
+var j;
+var i;
+springData = springData.slice(1);
+console.log(springData);
+function bodySprings(spinePosition) {
+  let n = spinePosition.length;
+  let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
+  let V = new Array(2 * n).fill(0).map(() => 0);
+  for (var i2 = 0;i2 < springData.length; i2++) {
+    let coeffs = springData[i2].coefficients;
+    let targetLength = springData[i2].targetLength;
+    let stiffness = springData[i2].stiffness;
+    let S = coeffs.map((o, index) => spinePosition[index].scale(o)).reduce((a2, b2) => a2.add(b2));
+    let invSlen = 1 / S.length();
+    let sLenNeg3 = invSlen ** 3;
+    let tslen = targetLength * invSlen;
+    let xv = coeffs.map((o) => -2 * stiffness * o * S.x * (1 - tslen));
+    for (var j2 = 0;j2 < n; j2++) {
+      V[j2] += xv[j2];
+    }
+    let yv = coeffs.map((o) => -2 * stiffness * o * S.y * (1 - tslen));
+    for (var j2 = 0;j2 < n; j2++) {
+      V[j2 + n] += yv[j2];
+    }
+    let tsxl = targetLength * sLenNeg3 * S.x * S.x;
+    for (var a = 0;a < n; a++) {
+      for (var b = 0;b < n; b++) {
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsxl);
+        F[a][b] += addVal;
+      }
+    }
+    let tsyl = targetLength * sLenNeg3 * S.y * S.y;
+    for (var a = 0;a < n; a++) {
+      for (var b = 0;b < n; b++) {
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsyl);
+        F[a + n][b + n] += addVal;
+      }
+    }
+    let tsxy = targetLength * sLenNeg3 * S.x * S.y;
+    for (var a = 0;a < n; a++) {
+      for (var b = 0;b < n; b++) {
+        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * tsxy;
+        F[a][b + n] += addVal;
+        F[a + n][b] += addVal;
+      }
+    }
+  }
+  return { F, V };
+}
+function padeNextFrame(spinePosition, spineVel, delta) {
+  let n = spinePosition.length;
+  let { F, V } = bodySprings(spinePosition);
+  let shiftPos = spinePosition.map((o) => [[[o.x]], [[o.y]]]).reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
+  let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map((o) => o[0]);
+  for (var i2 = 0;i2 < 2 * n; i2++) {
+    V[i2] -= acc[i2];
+  }
+  let identityMatrix = Array.from({ length: 2 * n }, () => Array(2 * n).fill(0)).map((row, i3) => row.map((val, j2) => i3 === j2 ? 1 : 0));
+  let builtMatrix = [[]];
+  let zeroN = Array.from({ length: 2 * n }, () => 0);
+  for (var i2 = 0;i2 < 2 * n; i2++) {
+    builtMatrix.push(zeroN.concat(identityMatrix[i2]).concat([0]));
+  }
+  for (var i2 = 0;i2 < 2 * n; i2++) {
+    builtMatrix.push(F[i2].concat(identityMatrix[i2].map((val) => val * -1)).concat([V[i2]]));
+  }
+  builtMatrix.push(zeroN.concat(zeroN).concat(0));
+  builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));
+  let a0 = spinePosition.map((o) => o.x).concat(spinePosition.map((o) => o.y)).concat(spineVel.map((o) => o.x)).concat(spineVel.map((o) => o.y)).concat([1]).map((o) => [o]);
+  let newMatrix = padeApproximation(builtMatrix, 5);
+  let answer = multiplyMatrices(newMatrix, a0).map((o) => o[0]);
+  var pos = [];
+  var vel = [];
+  for (var i2 = 0;i2 < n; i2++) {
+    pos.push(new Point(answer[i2], answer[i2 + n]));
+    vel.push(new Point(answer[i2 + 2 * n], answer[i2 + 3 * n]));
+  }
+  return { spinePosition: pos, spineVel: vel };
+}
+console.log(InvertMatrix([
+  [1, 0, 0, 0],
+  [-3, 3, 0, 0],
+  [3, -6, 3, 0],
+  [-1, 3, -3, 1]
+]));
+
 // scriptsDev/collide.tsx
 class detector {
   static blobloop = [
@@ -178,19 +469,19 @@ class detector {
   static getCurveBoundingBoxes(inputBString) {
     let count = inputBString.length;
     let curves = [];
-    for (var i = 0;i < count; i++) {
-      curves.push(Curve.fromBSpline(inputBString[i], inputBString[(i + 1) % count], inputBString[(i + 2) % count], inputBString[(i + 3) % count]));
+    for (var i2 = 0;i2 < count; i2++) {
+      curves.push(Curve.fromBSpline(inputBString[i2], inputBString[(i2 + 1) % count], inputBString[(i2 + 2) % count], inputBString[(i2 + 3) % count]));
     }
     return curves.map((o) => o.boundingBox()).map((o) => [o.lowest, o.highest]);
   }
   static AABB(col1, col2) {
     let returnIndecies = [];
-    for (var i = 0;i < col1.length; i++) {
-      for (var j = 0;j < col2.length; j++) {
-        let xCol = Math.max(col1[i][0].x, col2[j][0].x) <= Math.min(col1[i][1].x, col2[j][1].x);
-        let yCol = Math.max(col1[i][0].y, col2[j][0].y) <= Math.min(col1[i][1].y, col2[j][1].y);
+    for (var i2 = 0;i2 < col1.length; i2++) {
+      for (var j2 = 0;j2 < col2.length; j2++) {
+        let xCol = Math.max(col1[i2][0].x, col2[j2][0].x) <= Math.min(col1[i2][1].x, col2[j2][1].x);
+        let yCol = Math.max(col1[i2][0].y, col2[j2][0].y) <= Math.min(col1[i2][1].y, col2[j2][1].y);
         if (xCol && yCol) {
-          returnIndecies.push([i, j]);
+          returnIndecies.push([i2, j2]);
         }
       }
     }
@@ -277,23 +568,23 @@ class detector {
     if (Math.abs(upCount + downCount) < 2) {
       endPoints.push(i2[0]);
     }
-    for (var i = 0;i < candidates.length; i++) {
+    for (var i3 = 0;i3 < candidates.length; i3++) {
       let prevCount = upCount + downCount;
-      if (candidates[i].line) {
-        upCount = candidates[i].ingress;
+      if (candidates[i3].line) {
+        upCount = candidates[i3].ingress;
       } else {
-        downCount = candidates[i].ingress;
+        downCount = candidates[i3].ingress;
       }
       if (Math.abs(upCount + downCount) < 2 != Math.abs(prevCount) < 2) {
-        endPoints.push(candidates[i].t);
+        endPoints.push(candidates[i3].t);
       }
     }
     if (Math.abs(upCount + downCount) < 2) {
       endPoints.push(i2[0]);
     }
     var result = [];
-    for (var i = 0;i < endPoints.length; i += 2) {
-      result.push([endPoints[i], endPoints[i + 1]]);
+    for (var i3 = 0;i3 < endPoints.length; i3 += 2) {
+      result.push([endPoints[i3], endPoints[i3 + 1]]);
     }
     if (result.length == 1) {
       if (result[0][1] - result[0][0] > 0.8 * (i2[1] - i2[0])) {
@@ -314,19 +605,43 @@ class detector {
     if (depth % 2 == 0) {
       let refined = this.refineHybclip(curve2, curve1, i2, i1);
       console.log(depth);
-      for (var i = 0;i < refined.length; i++) {
-        let subResult = this.solveCollision(curve1, curve2, refined[i], i2, depth - 1);
+      for (var i3 = 0;i3 < refined.length; i3++) {
+        let subResult = this.solveCollision(curve1, curve2, refined[i3], i2, depth - 1);
         returner = returner.concat(subResult);
       }
     } else {
       let refined = this.refineHybclip(curve1, curve2, i1, i2);
       console.log(depth);
-      for (var i = 0;i < refined.length; i++) {
-        let subResult = this.solveCollision(curve1, curve2, i1, refined[i], depth - 1);
+      for (var i3 = 0;i3 < refined.length; i3++) {
+        let subResult = this.solveCollision(curve1, curve2, i1, refined[i3], depth - 1);
         returner = returner.concat(subResult);
       }
     }
     return returner;
+  }
+  static dir1Force(curve1, curve2, t, u) {
+    let tc = curve1.coeff();
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
+    let uc = curve2.coeff();
+    let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3];
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * t ** (i2 + j2)));
+    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * t ** (i2 + j2 - 1) * arrTc[i2].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
+    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * u ** (i2 + j2)));
+    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * u ** (i2 + j2 - 1) * arrUc[i2].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
+    let c1dir = curve1.value(curve1.coeff1Dir(), t);
+    let c2dir = curve2.value(curve2.coeff1Dir(), t);
+    let curve1Weights = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3];
+    let curve2Weights = [(1 - u) ** 3, 3 * (1 - u) ** 2 * u, 3 * (1 - u) * u ** 2, u ** 3];
+    let dirMat = [
+      [-c1dir.x, c2dir.x],
+      [-c1dir.y, c2dir.y]
+    ];
+    let revDir = InvertMatrix(dirMat);
+    let xtcrut = tsd0.map((o, i2) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i2]).reduce((a, b) => a + b));
+    let ytcrut = tsd0.map((o, i2) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i2]).reduce((a, b) => a + b));
+    let xucrut = tsd0.map((o, i2) => o.map((p, index) => -arrUc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * -curve1Weights[i2]).reduce((a, b) => a + b));
+    let yucrut = tsd0.map((o, i2) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * -curve1Weights[i2]).reduce((a, b) => a + b));
+    return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)];
   }
 }
 var collide_default = { detector };

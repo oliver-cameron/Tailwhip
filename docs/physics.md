@@ -65,3 +65,10 @@ Tangental cost (Total vorticity/discrepancy of velocity):
 C_T = \frac{1}{2} \oint_{C}{\left(v(r) \cdot \mathrm{d}r\right)}
 ```
 where $v(r)$ is the velocity at point r. That's a dot product there by the way.
+```math
+\forall
+\not\exists
+
+
+x \in \mathbb{R}
+```

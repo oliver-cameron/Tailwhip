@@ -215,7 +215,7 @@ var lizardCharacters = {
     }
   ],
   myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
-    { index: 5, offset: new Point(50, 4) },
+    { index: 4.99, offset: new Point(50, 4) },
     { index: 4, offset: new Point(0, 7) },
     { index: 3, offset: new Point(0, 10) },
     { index: 2, offset: new Point(-15, 20) },
@@ -248,9 +248,17 @@ var lizardCharacters = {
     return other.toBSpace(point, bodyPoint, secant.normalise());
   },
   fromBodySpace(index, point) {
-    let bodyPoint = this.myCharacter.spine[index];
-    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
-    return other.fromBSpace(point, bodyPoint, secant.normalise());
+    let t = index % 1;
+    let seg = Math.floor(index);
+    let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
+    let p1 = this.myCharacter.spine[seg];
+    let p2 = this.myCharacter.spine[seg + 1];
+    let p3 = seg == spineAmount - 1 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 1];
+    let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
+    let curvePoint = curCurve.value(curCurve.coeff(), t);
+    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);
+    let normal = new Point(-secant.y, secant.x);
+    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
   },
   updateArms(lizard, states) {
     let newArms = lizard.arms;
@@ -416,6 +424,39 @@ function padeApproximation(Matrix, order) {
   }
   return x;
 }
+function InvertMatrix(matrix) {
+  let n = matrix.length;
+  for (var i = 0;i < n; i++) {
+    if (matrix[i].length != n) {
+      throw new Error("Matrix is not square");
+    }
+  }
+  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0));
+  for (var i = 0;i < n; i++) {
+    for (var j = i + 1;j < n; j++) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = n - 1;i >= 0; i--) {
+    for (var j = n - 1;j > i; j--) {
+      let scale = matrix[j][i] / matrix[i][i];
+      for (var k = 0;k < n; k++) {
+        matrix[j][k] -= scale * matrix[i][k];
+        L[j][k] -= scale * L[i][k];
+      }
+    }
+  }
+  for (var i = 0;i < n; i++) {
+    for (var j = 0;j < n; j++) {
+      L[i][j] /= matrix[i][i];
+    }
+  }
+  return L;
+}
 var bodyLineLength = 50;
 var springForces = [
   {
@@ -546,6 +587,12 @@ function padeNextFrame(spinePosition, spineVel, delta) {
   }
   return { spinePosition: pos, spineVel: vel };
 }
+console.log(InvertMatrix([
+  [1, 0, 0, 0],
+  [-3, 3, 0, 0],
+  [3, -6, 3, 0],
+  [-1, 3, -3, 1]
+]));
 
 // scriptsDev/collide.tsx
 class detector {
@@ -716,6 +763,30 @@ class detector {
     }
     return returner;
   }
+  static dir1Force(curve1, curve2, t, u) {
+    let tc = curve1.coeff();
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
+    let uc = curve2.coeff();
+    let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3];
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * t ** (i2 + j2)));
+    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * t ** (i2 + j2 - 1) * arrTc[i2].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
+    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * u ** (i2 + j2)));
+    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * u ** (i2 + j2 - 1) * arrUc[i2].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
+    let c1dir = curve1.value(curve1.coeff1Dir(), t);
+    let c2dir = curve2.value(curve2.coeff1Dir(), t);
+    let curve1Weights = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3];
+    let curve2Weights = [(1 - u) ** 3, 3 * (1 - u) ** 2 * u, 3 * (1 - u) * u ** 2, u ** 3];
+    let dirMat = [
+      [-c1dir.x, c2dir.x],
+      [-c1dir.y, c2dir.y]
+    ];
+    let revDir = InvertMatrix(dirMat);
+    let xtcrut = tsd0.map((o, i2) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i2]).reduce((a, b) => a + b));
+    let ytcrut = tsd0.map((o, i2) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i2]).reduce((a, b) => a + b));
+    let xucrut = tsd0.map((o, i2) => o.map((p, index) => -arrUc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * -curve1Weights[i2]).reduce((a, b) => a + b));
+    let yucrut = tsd0.map((o, i2) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * -curve1Weights[i2]).reduce((a, b) => a + b));
+    return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)];
+  }
 }
 var collide_default = { detector };
 
@@ -866,7 +937,3 @@ app.ticker.add((delta) => {
   gfx.closePath();
   gfx.stroke();
 });
-var C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
-var C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));
-console.log("HI");
-console.log(detector.solveCollision(C1, C2));

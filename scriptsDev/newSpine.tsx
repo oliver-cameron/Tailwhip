@@ -374,7 +374,7 @@ function bodySprings(spinePosition: Point[]): { F: number[][]; V: number[] } {
     let S: Point = coeffs
       .map((o, index) => spinePosition[index].scale(o))
       .reduce((a, b) => a.add(b));
-    let invSlen = 1 / S.length;
+    let invSlen = 1 / S.length();
     let sLenNeg3 = invSlen ** 3;
     // tslen = T / |s|
     let tslen = targetLength * invSlen;

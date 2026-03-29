@@ -215,7 +215,7 @@ var lizardCharacters = {
     }
   ],
   myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
-    { index: 5, offset: new Point(50, 4) },
+    { index: 4.99, offset: new Point(50, 4) },
     { index: 4, offset: new Point(0, 7) },
     { index: 3, offset: new Point(0, 10) },
     { index: 2, offset: new Point(-15, 20) },
@@ -248,9 +248,17 @@ var lizardCharacters = {
     return other.toBSpace(point, bodyPoint, secant.normalise());
   },
   fromBodySpace(index, point) {
-    let bodyPoint = this.myCharacter.spine[index];
-    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
-    return other.fromBSpace(point, bodyPoint, secant.normalise());
+    let t = index % 1;
+    let seg = Math.floor(index);
+    let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
+    let p1 = this.myCharacter.spine[seg];
+    let p2 = this.myCharacter.spine[seg + 1];
+    let p3 = seg == spineAmount - 1 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 1];
+    let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
+    let curvePoint = curCurve.value(curCurve.coeff(), t);
+    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);
+    let normal = new Point(-secant.y, secant.x);
+    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
   },
   updateArms(lizard, states) {
     let newArms = lizard.arms;
