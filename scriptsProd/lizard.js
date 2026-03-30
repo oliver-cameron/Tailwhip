@@ -253,7 +253,7 @@ var lizardCharacters = {
     let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
     let p1 = this.myCharacter.spine[seg];
     let p2 = this.myCharacter.spine[seg + 1];
-    let p3 = seg == spineAmount - 1 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 1];
+    let p3 = seg == spineAmount - 2 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 2];
     let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
     let curvePoint = curCurve.value(curCurve.coeff(), t);
     let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);

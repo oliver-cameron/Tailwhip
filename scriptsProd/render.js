@@ -253,7 +253,7 @@ var lizardCharacters = {
     let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
     let p1 = this.myCharacter.spine[seg];
     let p2 = this.myCharacter.spine[seg + 1];
-    let p3 = seg == spineAmount - 1 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 1];
+    let p3 = seg == spineAmount - 2 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 2];
     let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
     let curvePoint = curCurve.value(curCurve.coeff(), t);
     let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);
@@ -314,7 +314,7 @@ class Spine {
 }
 function updateSpine(spine, headforce, deltaTime) {
   spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity.reduce((a, b) => a.add(b)).scale(1 / spine.points.length);
@@ -557,9 +557,63 @@ function bodySprings(spinePosition) {
   }
   return { F, V };
 }
+function backTrackCurve(forces, index) {
+  let p0 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1 / 6);
+  let p1 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1 / 6);
+  let p2 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1 / 6);
+  let p3 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(1)).scale(1 / 6);
+  return [p0, p1, p2, p3];
+}
+function backTrackPoint(point, index, bodyShape) {
+  let bodyPoint = new Point(point.y, -point.x).scale(bodyShape.y).add(point.scale(bodyShape.x));
+  let t = index % 1;
+  let weightPos = [-3 * t ** 3 + 6 * t ** 2 - 3 * t, 5 * t ** 3 - 9 * t ** 2 + 4 * t, -5 * t ** 3 + 6 * t ** 2 + 3 * t + 1, 3 * t ** 3 - 3 * t ** 2].map((o) => o / 4);
+  let dirPos = [-9 * t ** 2 + 12 * t - 3, 15 * t ** 2 - 18 * t + 4, -15 * t ** 2 + 12 * t + 3, 9 * t ** 2 - 6 * t].map((o) => o / 4);
+  let p0 = point.scale(weightPos[0]).add(bodyPoint.scale(dirPos[0]));
+  let p1 = point.scale(weightPos[1]).add(bodyPoint.scale(dirPos[1]));
+  let p2 = point.scale(weightPos[2]).add(bodyPoint.scale(dirPos[2]));
+  let p3 = point.scale(weightPos[3]).add(bodyPoint.scale(dirPos[3]));
+  return [p0, p1, p2, p3];
+}
+function shrinkPoints(spinePosition) {
+  let n = spinePosition.length;
+  let skinForces = Array(lizardCharacters.myCharacter.bodyShape.length).fill(Point.zero);
+  let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
+  for (var i2 = 0;i2 < outline.length; i2++) {
+    let curve = Curve.fromBSpline(outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length], outline[(i2 + 3) % outline.length]);
+    let curveForces = backTrackCurve(detector.shrinkCurve(curve), i2);
+    skinForces[i2] = skinForces[i2].add(curveForces[0]);
+    skinForces[(i2 + 1) % outline.length] = skinForces[(i2 + 1) % outline.length].add(curveForces[1]);
+    skinForces[(i2 + 2) % outline.length] = skinForces[(i2 + 2) % outline.length].add(curveForces[2]);
+    skinForces[(i2 + 3) % outline.length] = skinForces[(i2 + 3) % outline.length].add(curveForces[3]);
+  }
+  let spineForces = Array(spinePosition.length).fill(Point.zero);
+  let bodyShape = lizardCharacters.myCharacter.bodyShape;
+  for (var i2 = 0;i2 < skinForces.length; i2++) {
+    let index = Math.floor(bodyShape[i2].index);
+    let pointForces = backTrackPoint(skinForces[i2], bodyShape[i2].index, bodyShape[i2].offset);
+    if (index > 0 && index < spinePosition.length - 2) {
+      spineForces[index - 1] = spineForces[index - 1].add(pointForces[0]);
+      spineForces[index] = spineForces[index].add(pointForces[1]);
+      spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]);
+      spineForces[index + 2] = spineForces[index + 2].add(pointForces[3]);
+    } else if (index == 0) {
+      spineForces[0] = spineForces[0].add(pointForces[1]);
+      spineForces[1] = spineForces[1].add(pointForces[2]);
+      spineForces[2] = spineForces[2].add(pointForces[3]);
+    } else {
+      spineForces[index - 2] = spineForces[index - 2].add(pointForces[0]);
+      spineForces[index - 1] = spineForces[index - 1].add(pointForces[1]);
+      spineForces[index] = spineForces[index].add(pointForces[2]);
+    }
+  }
+  return spineForces;
+}
 function padeNextFrame(spinePosition, spineVel, delta) {
   let n = spinePosition.length;
   let { F, V } = bodySprings(spinePosition);
+  let shrinkX = shrinkPoints(spinePosition).map((o) => o.x);
+  let shrinkY = shrinkPoints(spinePosition).map((o) => o.y);
   let shiftPos = spinePosition.map((o) => [[[o.x]], [[o.y]]]).reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
   let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map((o) => o[0]);
   for (var i2 = 0;i2 < 2 * n; i2++) {
@@ -768,10 +822,10 @@ class detector {
     let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
     let uc = curve2.coeff();
     let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3];
-    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * t ** (i2 + j2)));
-    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * t ** (i2 + j2 - 1) * arrTc[i2].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
-    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => i2 + j2 == 0 ? 0 : (j2 - i2) / (i2 + j2) * u ** (i2 + j2)));
-    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i2) => (j2 - i2) * u ** (i2 + j2 - 1) * arrUc[i2].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * t ** (i3 + j2)));
+    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => (j2 - i3) * t ** (i3 + j2 - 1) * arrTc[i3].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
+    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * u ** (i3 + j2)));
+    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => (j2 - i3) * u ** (i3 + j2 - 1) * arrUc[i3].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
     let c1dir = curve1.value(curve1.coeff1Dir(), t);
     let c2dir = curve2.value(curve2.coeff1Dir(), t);
     let curve1Weights = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3];
@@ -781,13 +835,30 @@ class detector {
       [-c1dir.y, c2dir.y]
     ];
     let revDir = InvertMatrix(dirMat);
-    let xtcrut = tsd0.map((o, i2) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i2]).reduce((a, b) => a + b));
-    let ytcrut = tsd0.map((o, i2) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i2]).reduce((a, b) => a + b));
-    let xucrut = tsd0.map((o, i2) => o.map((p, index) => -arrUc[index].y * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[0] * -curve1Weights[i2]).reduce((a, b) => a + b));
-    let yucrut = tsd0.map((o, i2) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + dirMat.map((p, index) => [tsd1, usd1][index] * p[1] * -curve1Weights[i2]).reduce((a, b) => a + b));
-    return [xtcrut.concat(ytcrut), xucrut.concat(yucrut)];
+    let xtcrut = tsd0.map((o, i3) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i3]).reduce((a, b) => a + b));
+    let ytcrut = tsd0.map((o, i3) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i3]).reduce((a, b) => a + b));
+    let xucrut = tsd0.map((o, i3) => o.map((p, index) => -arrUc[index].y * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i3]).reduce((a, b) => a + b));
+    let yucrut = tsd0.map((o, i3) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] * -curve2Weights[i3]).reduce((a, b) => a + b));
+    let retT = [];
+    let retU = [];
+    for (var i2 = 0;i2 < 4; i2++) {
+      retT.push(new Point(xtcrut[i2], ytcrut[i2]));
+      retU.push(new Point(xucrut[i2], yucrut[i2]));
+    }
+    return [retT, retU];
   }
-  static shrinkCurve(curve) {}
+  static shrinkCurve(curve) {
+    let tc = curve.coeff();
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
+    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2)));
+    let xtcrut = tsd0.map((o) => o.map((p, index) => p * -arrTc[index].y).reduce((a, b) => a + b));
+    let ytcrut = tsd0.map((o) => o.map((p, index) => p * arrTc[index].x).reduce((a, b) => a + b));
+    let ret = [];
+    for (var i2 = 0;i2 < 4; i2++) {
+      ret.push(new Point(xtcrut[i2], ytcrut[i2]));
+    }
+    return ret;
+  }
 }
 var C1 = new Curve(new Point(1, -1), new Point(0.7, -0.7), new Point(0.2, -0.7), new Point(0, -1));
 var C2 = new Curve(new Point(0.2, -0.4), new Point(0.3, -1.4), new Point(0.7, -1.3), new Point(0.9, -0.4));

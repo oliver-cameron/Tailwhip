@@ -159,6 +159,150 @@ var other = {
 };
 var geo_default = { Point, Curve, other };
 
+// scriptsDev/lizard.tsx
+class Lizard {
+  static dub = (p) => {
+    return p.concat(p.map((o) => ({
+      index: o.index,
+      offset: new Point(o.offset.x, -o.offset.y)
+    })).reverse());
+  };
+  id;
+  spine;
+  vel;
+  arms;
+  bodyShape;
+  spineLength = 6;
+  constructor(id, spine, arms, bodyShape) {
+    this.id = id;
+    this.spine = spine;
+    this.arms = arms;
+    this.bodyShape = bodyShape;
+    this.vel = {
+      oldPoints: spine,
+      velocitySpine: Array(spine.length).fill(Point.zero)
+    };
+  }
+}
+var spineAmount = 6;
+var lizardCharacters = {
+  lineLength: 50,
+  limbLength: 40,
+  limbDefs: [
+    {
+      index: 1,
+      baseOffset: new Point(0, -15),
+      handOffset: new Point(-5, -60),
+      clockwise: false
+    },
+    {
+      index: 1,
+      baseOffset: new Point(0, 15),
+      handOffset: new Point(5, 60),
+      clockwise: true
+    },
+    {
+      index: 3,
+      baseOffset: new Point(0, -5),
+      handOffset: new Point(-5, -50),
+      clockwise: true
+    },
+    {
+      index: 3,
+      baseOffset: new Point(0, 5),
+      handOffset: new Point(5, 50),
+      clockwise: false
+    }
+  ],
+  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
+    { index: 4.99, offset: new Point(50, 4) },
+    { index: 4, offset: new Point(0, 7) },
+    { index: 3, offset: new Point(0, 10) },
+    { index: 2, offset: new Point(-15, 20) },
+    { index: 1, offset: new Point(0, 16) },
+    { index: 0, offset: new Point(0, 20) },
+    { index: 0, offset: new Point(-20, 10) }
+  ])),
+  others: {},
+  updateSpine(lizard, direction, origin, deltaT) {
+    let newSpine = lizard.spine;
+    newSpine[0] = newSpine[0].add(direction.scale(deltaT.deltaTime) ?? Point.zero);
+    for (var i = 1;i < newSpine.length; i++) {
+      newSpine[i] = newSpine[i].add(lizard.vel.velocitySpine[i].scale(deltaT.deltaTime).scale(0.9));
+    }
+    for (var i = 2;i < newSpine.length; i++) {
+      newSpine[i] = other.spring(newSpine[i - 2], newSpine[i - 1], newSpine[i], 0.5, 0.1, deltaT.deltaTime);
+    }
+    for (var i = 1;i < newSpine.length; i++) {
+      newSpine[i] = other.lockDist(newSpine[i - 1], newSpine[i], this.lineLength);
+    }
+    for (var i = 0;i < newSpine.length; i++) {
+      lizard.vel.velocitySpine[i] = newSpine[i].subtract(lizard.spine[i]).scale(1 / deltaT.deltaTime);
+    }
+    this.myCharacter.spine = newSpine;
+    return newSpine;
+  },
+  toBodySpace(index, point) {
+    let bodyPoint = this.myCharacter.spine[index];
+    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
+    return other.toBSpace(point, bodyPoint, secant.normalise());
+  },
+  fromBodySpace(index, point) {
+    let t = index % 1;
+    let seg = Math.floor(index);
+    let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
+    let p1 = this.myCharacter.spine[seg];
+    let p2 = this.myCharacter.spine[seg + 1];
+    let p3 = seg == spineAmount - 2 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 2];
+    let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
+    let curvePoint = curCurve.value(curCurve.coeff(), t);
+    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);
+    let normal = new Point(-secant.y, secant.x);
+    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
+  },
+  updateArms(lizard, states) {
+    let newArms = lizard.arms;
+    for (var i = 0;i < 4; i++) {
+      if (newArms[i].subtract(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset)).length() >= this.limbLength * 2) {
+        newArms[i] = other.lockDist(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset), newArms[i], this.limbLength * 2);
+      }
+    }
+    this.myCharacter.arms = newArms;
+    return newArms;
+  },
+  draw(lizard, ctx) {
+    ctx.lineStyle(4, 65536, 1);
+    ctx.moveTo(lizard.spine[0].x, lizard.spine[0].y);
+    for (var i = 1;i < lizard.spine.length; i++) {
+      ctx.lineTo(lizard.spine[i].x, lizard.spine[i].y);
+    }
+    ctx.stroke();
+    ctx.lineStyle(2, 16711935, 1);
+    for (var i = 0;i < 4; i++) {
+      let limbDef = this.limbDefs[i];
+      let base = this.fromBodySpace(limbDef.index, limbDef.baseOffset);
+      let hand = lizard.arms[i];
+      let joint = other.inverseKinematics(base, hand, limbDef.clockwise, this.limbLength);
+      ctx.moveTo(base.x, base.y);
+      ctx.lineTo(joint.x, joint.y);
+      ctx.lineTo(hand.x, hand.y);
+      ctx.stroke();
+    }
+    let bodyShapePoints = lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
+    ctx.lineStyle(3, 65280, 1);
+    ctx.moveTo(bodyShapePoints[0].x, bodyShapePoints[0].y);
+    for (var i = 1;i < bodyShapePoints.length; i++) {
+      ctx.lineTo(bodyShapePoints[i].x, bodyShapePoints[i].y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+  },
+  outline(lizard) {
+    return lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
+  }
+};
+var lizard_default = { lizardCharacters, Lizard };
+
 // scriptsDev/newSpine.tsx
 class Spine {
   points;
@@ -413,9 +557,68 @@ function bodySprings(spinePosition) {
   }
   return { F, V };
 }
+function backTrackCurve(forces, index) {
+  let p0 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1 / 6);
+  let p1 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1 / 6);
+  let p2 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1 / 6);
+  let p3 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(1)).scale(1 / 6);
+  console.log(forces);
+  return [p0, p1, p2, p3];
+}
+function backTrackPoint(point, index, bodyShape) {
+  let bodyPoint = new Point(point.y, -point.x).scale(bodyShape.y).add(point.scale(bodyShape.x));
+  let t = index % 1;
+  let weightPos = [-3 * t ** 3 + 6 * t ** 2 - 3 * t, 5 * t ** 3 - 9 * t ** 2 + 4 * t, -5 * t ** 3 + 6 * t ** 2 + 3 * t + 1, 3 * t ** 3 - 3 * t ** 2].map((o) => o / 4);
+  let dirPos = [-9 * t ** 2 + 12 * t - 3, 15 * t ** 2 - 18 * t + 4, -15 * t ** 2 + 12 * t + 3, 9 * t ** 2 - 6 * t].map((o) => o / 4);
+  let p0 = point.scale(weightPos[0]).add(bodyPoint.scale(dirPos[0]));
+  let p1 = point.scale(weightPos[1]).add(bodyPoint.scale(dirPos[1]));
+  let p2 = point.scale(weightPos[2]).add(bodyPoint.scale(dirPos[2]));
+  let p3 = point.scale(weightPos[3]).add(bodyPoint.scale(dirPos[3]));
+  return [p0, p1, p2, p3];
+}
+function shrinkPoints(spinePosition) {
+  let n = spinePosition.length;
+  let skinForces = Array(lizardCharacters.myCharacter.bodyShape.length).fill(Point.zero);
+  let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
+  for (var i2 = 0;i2 < outline.length; i2++) {
+    let curve = Curve.fromBSpline(outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length], outline[(i2 + 3) % outline.length]);
+    let curveForces = backTrackCurve(skinForces, i2);
+    skinForces[i2] = skinForces[i2].add(curveForces[0]);
+    skinForces[(i2 + 1) % outline.length] = skinForces[(i2 + 1) % outline.length].add(curveForces[1]);
+    skinForces[(i2 + 2) % outline.length] = skinForces[(i2 + 2) % outline.length].add(curveForces[2]);
+    skinForces[(i2 + 3) % outline.length] = skinForces[(i2 + 3) % outline.length].add(curveForces[3]);
+  }
+  let spineForces = Array(spinePosition.length).fill(Point.zero);
+  let bodyShape = lizardCharacters.myCharacter.bodyShape;
+  for (var i2 = 0;i2 < skinForces.length; i2++) {
+    let index = Math.floor(bodyShape[i2].index);
+    let pointForces = backTrackPoint(skinForces[i2], bodyShape[i2].index, bodyShape[i2].offset);
+    if (index > 0 && index < spinePosition.length - 2) {
+      spineForces[index - 1] = spineForces[index - 1].add(pointForces[0]);
+      spineForces[index] = spineForces[index].add(pointForces[1]);
+      spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]);
+      spineForces[index + 2] = spineForces[index + 2].add(pointForces[3]);
+    } else if (index == 0) {
+      spineForces[0] = spineForces[0].add(pointForces[1]);
+      spineForces[1] = spineForces[1].add(pointForces[2]);
+      spineForces[2] = spineForces[2].add(pointForces[3]);
+    } else {
+      spineForces[index - 2] = spineForces[index - 2].add(pointForces[0]);
+      spineForces[index - 1] = spineForces[index - 1].add(pointForces[1]);
+      spineForces[index] = spineForces[index].add(pointForces[2]);
+    }
+  }
+  return spineForces;
+}
 function padeNextFrame(spinePosition, spineVel, delta) {
   let n = spinePosition.length;
   let { F, V } = bodySprings(spinePosition);
+  let shrinkX = shrinkPoints(spinePosition).map((o) => o.x);
+  let shrinkY = shrinkPoints(spinePosition).map((o) => o.y);
+  for (var i2 = 0;i2 < n; i2++) {
+    V[i2] += shrinkX[i2] * 200;
+    V[i2 + n] += shrinkY[i2] * 200;
+  }
   let shiftPos = spinePosition.map((o) => [[[o.x]], [[o.y]]]).reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
   let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map((o) => o[0]);
   for (var i2 = 0;i2 < 2 * n; i2++) {
