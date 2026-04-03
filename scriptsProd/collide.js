@@ -314,7 +314,7 @@ class Spine {
 }
 function updateSpine(spine, headforce, deltaTime) {
   spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   let avgVel = spine.velocity.reduce((a, b) => a.add(b)).scale(1 / spine.points.length);
@@ -558,10 +558,10 @@ function bodySprings(spinePosition) {
   return { F, V };
 }
 function backTrackCurve(forces, index) {
-  let p0 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1 / 6);
-  let p1 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1 / 6);
-  let p2 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1 / 6);
-  let p3 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(1)).scale(1 / 6);
+  let p0 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(0)).scale(1 / 6);
+  let p1 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1 / 6);
+  let p2 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1 / 6);
+  let p3 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1 / 6);
   return [p0, p1, p2, p3];
 }
 function backTrackPoint(point, index, bodyShape) {
@@ -575,10 +575,17 @@ function backTrackPoint(point, index, bodyShape) {
   let p3 = point.scale(weightPos[3]).add(bodyPoint.scale(dirPos[3]));
   return [p0, p1, p2, p3];
 }
-function shrinkPoints(spinePosition) {
+function shrinkPoints(spinePosition, bodyShape) {
   let n = spinePosition.length;
-  let skinForces = Array(lizardCharacters.myCharacter.bodyShape.length).fill(Point.zero);
-  let outline = lizardCharacters.outline(lizardCharacters.myCharacter);
+  let skinForces = Array(bodyShape.length).fill(Point.zero);
+  let outline = bodyShape.map((o) => {
+    let index = Math.floor(o.index);
+    let baseCurve = Curve.fromKSpline(index == 0 ? spinePosition[0].scale(2).subtract(spinePosition[1]) : spinePosition[index - 1], spinePosition[index], spinePosition[index + 1], index == spinePosition.length - 2 ? spinePosition[spinePosition.length - 1].scale(2).subtract(spinePosition[spinePosition.length - 2]) : spinePosition[index + 2]);
+    let curvePoint = baseCurve.value(baseCurve.coeff(), o.index % 1);
+    let secant = baseCurve.value(baseCurve.coeff1Dir(), o.index % 1);
+    let normal = new Point(-secant.y, secant.x);
+    return curvePoint.add(normal.scale(o.offset.x)).add(secant.scale(o.offset.y));
+  });
   for (var i2 = 0;i2 < outline.length; i2++) {
     let curve = Curve.fromBSpline(outline[i2], outline[(i2 + 1) % outline.length], outline[(i2 + 2) % outline.length], outline[(i2 + 3) % outline.length]);
     let curveForces = backTrackCurve(detector.shrinkCurve(curve), i2);
@@ -588,7 +595,6 @@ function shrinkPoints(spinePosition) {
     skinForces[(i2 + 3) % outline.length] = skinForces[(i2 + 3) % outline.length].add(curveForces[3]);
   }
   let spineForces = Array(spinePosition.length).fill(Point.zero);
-  let bodyShape = lizardCharacters.myCharacter.bodyShape;
   for (var i2 = 0;i2 < skinForces.length; i2++) {
     let index = Math.floor(bodyShape[i2].index);
     let pointForces = backTrackPoint(skinForces[i2], bodyShape[i2].index, bodyShape[i2].offset);
@@ -612,8 +618,12 @@ function shrinkPoints(spinePosition) {
 function padeNextFrame(spinePosition, spineVel, delta) {
   let n = spinePosition.length;
   let { F, V } = bodySprings(spinePosition);
-  let shrinkX = shrinkPoints(spinePosition).map((o) => o.x);
-  let shrinkY = shrinkPoints(spinePosition).map((o) => o.y);
+  let shrinkX = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape).map((o) => o.x);
+  let shrinkY = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape).map((o) => o.y);
+  for (var i2 = 0;i2 < n; i2++) {
+    V[i2] += shrinkX[i2] * 500;
+    V[i2 + n] += shrinkY[i2] * 500;
+  }
   let shiftPos = spinePosition.map((o) => [[[o.x]], [[o.y]]]).reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
   let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map((o) => o[0]);
   for (var i2 = 0;i2 < 2 * n; i2++) {
