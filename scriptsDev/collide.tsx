@@ -14,7 +14,7 @@ export class detector {
     new Point(400, 550),
     new Point(450, 550),
     new Point(450, 500),
-  ];
+  ].reverse();
   static getCurveBoundingBoxes(inputBString: Point[]): [Point, Point][] {
     let count = inputBString.length;
     let curves: Curve[] = [] as Curve[];
@@ -127,7 +127,7 @@ export class detector {
       this.quadFormula(downLine.t2, downLine.t1, downLine.t0 - maxDist).map(
         (o) => ({
           t: o,
-          ingress: upLine.t1 + 2 * upLine.t2 * o < 0 ? 0 : 1,
+          ingress: downLine.t1 + 2 * downLine.t2 * o < 0 ? 0 : 1,
           line: false,
         }),
       );
@@ -178,7 +178,7 @@ export class detector {
       }
     }
     if (Math.abs(upCount + downCount) < 2) {
-      endPoints.push(i2[0]);
+      endPoints.push(i2[1]);
     }
     var result: [number, number][] = [];
     for (var i = 0; i < endPoints.length; i += 2) {
@@ -201,17 +201,19 @@ export class detector {
     i1: [number, number] = [0, 1],
     i2: [number, number] = [0, 1],
     depth: number = 5,
-  ): { i1: [number, number]; i2: [number, number] }[] {
+  ): { i1: number; i2: number, add: boolean }[] {
     if (depth == 0) {
-      return [{ i1: i1, i2: i2 }];
+      let cr = curve1.value(curve1.coeff1Dir(), i1[0]).crossProduct(curve2.value(curve2.coeff1Dir(), i2[0]));
+      let add = cr > 0 ? true : false;
+      return [{ i1: i1[0], i2: i2[0], add: add }];
     }
     let returner = [] as {
-      i1: [number, number];
-      i2: [number, number];
+      i1: number;
+      i2: number;
+      add: boolean;
     }[];
     if (depth % 2 == 0) {
       let refined = this.refineHybclip(curve2, curve1, i2, i1);
-      console.log(depth);
       for (var i = 0; i < refined.length; i++) {
         let subResult = this.solveCollision(
           curve1,
@@ -224,7 +226,6 @@ export class detector {
       }
     } else {
       let refined = this.refineHybclip(curve1, curve2, i1, i2);
-      console.log(depth);
       for (var i = 0; i < refined.length; i++) {
         let subResult = this.solveCollision(
           curve1,
@@ -282,8 +283,8 @@ export class detector {
     let revDir = InvertMatrix(dirMat)
     let xtcrut = tsd0.map((o, i) => o.map((p, index) => -arrTc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] *  curve1Weights[i] ).reduce((a,b) => a+b))
     let ytcrut = tsd0.map((o, i) => o.map((p, index) => arrTc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *   curve1Weights[i] ).reduce((a,b) => a+b))
-    let xucrut = tsd0.map((o, i) => o.map((p, index) => -arrUc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i] ).reduce((a,b) => a+b))
-    let yucrut = tsd0.map((o, i) => o.map((p, index) => arrUc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve2Weights[i] ).reduce((a,b) => a+b))
+    let xucrut = usd0.map((o, i) => o.map((p, index) => -arrUc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i] ).reduce((a,b) => a+b))
+    let yucrut = usd0.map((o, i) => o.map((p, index) => arrUc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve2Weights[i] ).reduce((a,b) => a+b))
     let retT: Point[] = []
     let retU: Point[] = []
     for(var i = 0; i < 4; i++){
@@ -307,18 +308,5 @@ export class detector {
   }
 }
 
-let C1 = new Curve(
-  new Point(1, -1),
-  new Point(0.7, -0.7),
-  new Point(0.2, -0.7),
-  new Point(0, -1),
-);
-let C2 = new Curve(
-  new Point(0.2, -0.4),
-  new Point(0.3, -1.4),
-  new Point(0.7, -1.3),
-  new Point(0.9, -0.4),
-);
-console.log("HI");
-console.log(detector.solveCollision(C1, C2))
+
 export default { detector };

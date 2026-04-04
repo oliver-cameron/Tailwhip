@@ -56,7 +56,7 @@ Bun.serve({
     }),
     "/newRender.js": new Response(Bun.file("./scriptsProd/newRender.js"), {
       headers: { "Content-Type": "application/javascript" },
-    }),
+    })
   },
 });
 console.log("Server running on http://localhost:8000");

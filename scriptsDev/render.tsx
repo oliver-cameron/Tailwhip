@@ -5,12 +5,9 @@ import { detector } from "./collide";
 var app = new PIXI.Application();
 // (async function () {
 await app.init({ background: "#FFF", resizeTo: window, antialias: true });
-console.log(app);
-console.log("hello");
-console.log(PIXI);
 document.getElementById("graphics").appendChild(app.canvas);
 // })();
-let gfx = new PIXI.Graphics();
+export let gfx = new PIXI.Graphics();
 let testSpine = new Spine(
   // Array(4)
   //   .fill(Point.zero)
@@ -32,7 +29,7 @@ window.addEventListener("keyup", (e) => {
   keyboard[e.key] = false;
 });
 let blob = detector.blobloop;
-function drawBSplineSegment(p0, p1, p2, p3) {
+export function drawBSplineSegment(p0, p1, p2, p3) {
   // Convert to Bézier control points
   let b0 = {
     x: (p0.x + 4 * p1.x + p2.x) / 6,
@@ -68,10 +65,7 @@ app.ticker.add((delta) => {
   if (keyboard["d"]) {
     headForce = headForce.add(new Point(100, 0));
   }
-  // console.log(headForce);
   // Update spine
-
-  testSpine = updateSpine(testSpine, headForce, delta.deltaTime);
   gfx.clear();
   gfx.lineStyle(4, 0x000001, 1);
   gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
@@ -156,6 +150,7 @@ app.ticker.add((delta) => {
   gfx.stroke();
   // Now, draw circles at collision points. Only need to draw circles for lizard, as they are collisions and should be the same points on the blob
   // But good to check anyway
+  let collisions: {t: number, u: number, add: boolean}[] = [];
   for (var i = 0; i < collisionIndecies.length; i++) {
     let collisionIndex = collisionIndecies[i];
     let curve1 = Curve.fromBSpline(
@@ -171,15 +166,30 @@ app.ticker.add((delta) => {
       blob[(collisionIndex[1] + 3) % blob.length],
     );
     let collisionPoints = detector.solveCollision(curve1, curve2);
-    console.log(collisionPoints);
+    collisions.push(...collisionPoints.map(o => ({t: o.i1 + collisionIndex[0], u: o.i2 + collisionIndex[1], add: o.add}))); 
     for (var j = 0; j < collisionPoints.length; j++) {
       let collisionT = collisionPoints[j];
-      let collisionPoint = curve1.value(curve1.coeff(), collisionT.i1[0]);
+      let collisionPoint = curve1.value(curve1.coeff(), collisionT.i1);
       gfx.beginFill(0xffaa44, 1);
       gfx.drawCircle(collisionPoint.x, collisionPoint.y, 5);
       gfx.endFill();
     }
   }
+  // And now we can add a collider between the lizard and the blob at these collision points, and see how it reacts to forces and stuff. This is the basis for the "gameplay" of the game, as the player will be trying to get the blob to collide with the lizard in certain ways to achieve certain goals. For now, we can just draw circles at the collision points and make them repel each other or something.
+  // First, fill a list of "shrinks" unaccounted by the collisions, where we have missing upper endpoint to the area integral. This will be between all integer t values between a true value and the next consecutive false value.
+  let shrinks: number[] = []
+  let pushingColliders: {index: number, t: number, u: number, otherCurve: Curve, add: boolean}[] = collisions.map(o => ({index: Math.floor(o.t), t: o.t % 1, u: o.u % 1, otherCurve: Curve.fromBSpline(blob[Math.floor(o.u)], blob[(Math.floor(o.u) + 1) % blob.length], blob[(Math.floor(o.u) + 2) % blob.length], blob[(Math.floor(o.u) + 3) % blob.length]), add: o.add}))
+  if(collisions.length > 0){
+  collisions.sort((a, b) => a.t - b.t);
+  for(var i = 0; i < outline.length; i++){
+    let first = collisions.findIndex(o => o.t > i);
+    if(collisions[first == -1 ? 0 : first].add == false){
+      shrinks.push(i);
+    }
+  }
+  }
+  console.log(shrinks);
+  testSpine = updateSpine(testSpine, headForce, delta.deltaTime, gfx, pushingColliders, shrinks);
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",
     "walk",
@@ -192,4 +202,3 @@ app.ticker.add((delta) => {
   gfx.closePath();
   gfx.stroke();
 });
-

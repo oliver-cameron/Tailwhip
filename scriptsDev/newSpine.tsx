@@ -17,18 +17,17 @@ export function updateSpine(
   spine: Spine,
   headforce: Point,
   deltaTime: number,
+  gtx?: any,
+  pushingColliders?: {index: number, t: number, u: number, otherCurve: Curve, add: boolean}[],
+  shrinks?: number[]
 ): Spine {
   spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
   // spine.velocity[spine.velocity.length - 1] = spine.velocity[
   //   spine.velocity.length - 1
   // ].subtract(headforce.scale(deltaTime));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000, gtx, pushingColliders, shrinks);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
-  let avgVel = spine.velocity
-    .reduce((a, b) => a.add(b))
-    .scale(1 / spine.points.length);
-  // spine.points = spine.points.map((o) => o.subtract(avgVel));
   return spine;
 }
 
@@ -364,7 +363,6 @@ for (var i = 0; i < springForces.length; i++) {
   });
 }
 springData = springData.slice(1);
-console.log(springData);
 function bodySprings(spinePosition: Point[]): { F: number[][]; V: number[] } {
   let n = spinePosition.length;
   let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
@@ -429,10 +427,10 @@ function backTrackCurve(
 ): Point[]{
   // Backtrack the curve defined by the forces, to find the point on the curve with the given force value at the given index. Uses binary search.
   // 1. Backtrack the forces on the coeficcients to find the forces on the b spline control points
-  let p0 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(0)).scale(1/6);
-  let p1 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1/6);
-  let p2 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1/6);
-  let p3 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1/6);
+  let p3 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(0)).scale(1/6);
+  let p2 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1/6);
+  let p1 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1/6);
+  let p0 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1/6);
 ;
   return [p0, p1, p2, p3]
 }
@@ -441,34 +439,44 @@ function backTrackPoint(
   index: number,
   bodyShape: Point
 ): Point[]{
-  let bodyPoint = new Point(point.y, -point.x).scale(bodyShape.y).add(point.scale(bodyShape.x));
+  let bodyPoint = new Point(point.y, -point.x).scale(bodyShape.y).add(point.scale(bodyShape.x)).scale(1/lizardCharacters.lineLength);
   let t = index % 1;
-  let weightPos = [-3 * t ** 3 + 6 * t ** 2 - 3 * t, 5 * t ** 3 - 9 * t ** 2 + 4 * t, -5 * t ** 3 + 6 * t ** 2 + 3 * t + 1, 3 * t ** 3 - 3 * t ** 2].map(o => o/4);
-  let dirPos = [-9 * t ** 2 + 12 * t - 3, 15 * t ** 2 - 18 * t + 4, -15 * t ** 2 + 12 * t + 3, 9 * t ** 2 - 6 * t].map(o => o/4);
+  let weightPos = [-3 * t ** 3 + 6 * t ** 2 - 3 * t, 5 * t ** 3 - 9 * t ** 2 + 4, -5 * t ** 3 + 6 * t ** 2 + 3 * t, 3 * t ** 3 - 3 * t ** 2].map(o => o/4);
+  let dirPos = [-9 * t ** 2 + 12 * t - 3, 15 * t ** 2 - 18 * t, -15 * t ** 2 + 12 * t + 3, 9 * t ** 2 - 6 * t].map(o => o/4);
   let p0 = point.scale(weightPos[0]).add(bodyPoint.scale(dirPos[0]));
   let p1 = point.scale(weightPos[1]).add(bodyPoint.scale(dirPos[1]));
   let p2 = point.scale(weightPos[2]).add(bodyPoint.scale(dirPos[2]));
   let p3 = point.scale(weightPos[3]).add(bodyPoint.scale(dirPos[3]));
   return [p0, p1, p2, p3];
 }
-function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset: Point}[]): Point[] {
+function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset: Point}[], gtx?: any, pushingColliders?: {index: number, t: number, u: number, otherCurve: Curve, add: boolean}[], shrinks?: number[]): Point[] {
   let n = spinePosition.length;
   let skinForces = Array(bodyShape.length).fill(Point.zero);
   // Get outline
   let outline = bodyShape.map((o) => {
-    let index = Math.floor(o.index);
-    let baseCurve = Curve.fromKSpline(
-      index == 0 ? spinePosition[0].scale(2).subtract(spinePosition[1]) : spinePosition[index - 1],
-      spinePosition[index],
-      spinePosition[index + 1],
-      index == spinePosition.length - 2 ? spinePosition[spinePosition.length - 1].scale(2).subtract(spinePosition[spinePosition.length - 2]) : spinePosition[index + 2],
+    let index = o.index
+    let point = o.offset;
+    let spineAmount = n
+    let t = index % 1;
+    let seg = Math.floor(index);
+    let p0 = seg == 0 ? spinePosition[0].scale(2).subtract(spinePosition[1]) : spinePosition[seg - 1];
+    let p1 = spinePosition[seg];
+    let p2 = spinePosition[seg + 1];
+    let p3 = seg == spineAmount - 2 ? spinePosition[spineAmount - 1].scale(2).subtract(spinePosition[spineAmount - 2]) : spinePosition[seg + 2];
+    let curCurve = Curve.fromKSpline(
+      p0,
+      p1,
+      p2,
+      p3,
     )
-    let curvePoint = baseCurve.value(baseCurve.coeff(), o.index % 1);
-    let secant = baseCurve.value(baseCurve.coeff1Dir(), o.index % 1);
+    let curvePoint = curCurve.value(curCurve.coeff(), t);
+    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / lizardCharacters.lineLength);
+    // Rotate secant by 90 degrees to get normal
     let normal = new Point(-secant.y, secant.x);
-    return curvePoint.add(normal.scale(o.offset.x)).add(secant.scale(o.offset.y));
+    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
   });
-  for(var i = 0; i < outline.length; i++){
+  for(var b = 0; b < shrinks.length; b++){
+    let i = shrinks[b];
     let curve = Curve.fromBSpline(outline[i], 
       outline[(i+1)%outline.length],
       outline[(i+2)%outline.length],
@@ -480,6 +488,27 @@ function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset:
     skinForces[(i+2)%outline.length] = skinForces[(i+2)%outline.length].add(curveForces[2]);
     skinForces[(i+3)%outline.length] = skinForces[(i+3)%outline.length].add(curveForces[3]);
   }
+  for(var b = 0; b < pushingColliders.length; b++){
+    let collision = pushingColliders[b];
+    let i = pushingColliders[b].index;
+    let curve = Curve.fromBSpline(outline[i], 
+      outline[(i+1)%outline.length],
+      outline[(i+2)%outline.length],
+      outline[(i+3)%outline.length]
+    )
+    let curveForces = backTrackCurve(detector.dir1Force(curve, collision.otherCurve, collision.t, collision.u)[0], i).map(o => !collision.add ? o : o.scale(-1));
+    skinForces[i] = skinForces[i].add(curveForces[0]);
+    skinForces[(i+1)%outline.length] = skinForces[(i+1)%outline.length].add(curveForces[1]);
+    skinForces[(i+2)%outline.length] = skinForces[(i+2)%outline.length].add(curveForces[2]);
+    skinForces[(i+3)%outline.length] = skinForces[(i+3)%outline.length].add(curveForces[3]);
+  } 
+  gtx.lineStyle(2, 0xff0000);
+  for(var i = 0; i < bodyShape.length; i++){
+    gtx.moveTo(outline[i].x, outline[i].y);
+    gtx.lineTo(outline[i].x + skinForces[i].x, outline[i].y + skinForces[i].y);
+  }
+  gtx.stroke();
+  // debugger;
   let spineForces = Array(spinePosition.length).fill(Point.zero);
   for(var i = 0; i < skinForces.length; i++){
     let index = Math.floor(bodyShape[i].index);
@@ -490,13 +519,13 @@ function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset:
       spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]);
       spineForces[index + 2] = spineForces[index + 2].add(pointForces[3]);
     } else if(index == 0){
-      spineForces[0] = spineForces[0].add(pointForces[1]);
-      spineForces[1] = spineForces[1].add(pointForces[2]);
+      spineForces[0] = spineForces[0].add(pointForces[1].add(pointForces[0].scale(2)));
+      spineForces[1] = spineForces[1].add(pointForces[2]).subtract(pointForces[0]);
       spineForces[2] = spineForces[2].add(pointForces[3]);
     } else {
-      spineForces[index - 2] = spineForces[index - 2].add(pointForces[0]);
-      spineForces[index - 1] = spineForces[index - 1].add(pointForces[1]);
-      spineForces[index] = spineForces[index].add(pointForces[2]);
+      spineForces[index - 1] = spineForces[index - 1].add(pointForces[0]);
+      spineForces[index] = spineForces[index].add(pointForces[1]).subtract(pointForces[3]);
+      spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]).add(pointForces[3].scale(2));
     }
   }
   return spineForces;
@@ -505,18 +534,22 @@ function padeNextFrame(
   spinePosition: Point[],
   spineVel: Point[],
   delta: number,
+  gtx?: any,
+  pushingColliders?: {index: number, t: number, u: number, otherCurve: Curve, add: boolean}[],
+  shrinks?: number[]
 ): { spinePosition: Point[]; spineVel: Point[] } {
   // Calculate matrix
   // Vector values are p1x, p2x, p3x, ..., p1y, p2y, p3y, ... v1x, v2x, v3x, ..., v1y, v2y, v3y, ..., 1
   // > 1. Construct blocks for dynamic force matrix (nxn), f and static force vector (nx1), v
   let n = spinePosition.length;
   let { F, V } = bodySprings(spinePosition);
-  let shrinkX = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape).map(o => o.x);
-  let shrinkY = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape).map(o => o.y);
+  let shrink = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape, gtx, pushingColliders, shrinks);
+  let shrinkX = shrink.map(o => o.x);
+  let shrinkY = shrink.map(o => o.y)
 ;
   for(var i = 0; i < n; i++){
-    V[i] += shrinkX[i] * 500;
-    V[i + n] += shrinkY[i] * 500;
+    V[i] -= shrinkX[i];
+    V[i + n] -= shrinkY[i];
   }
 
   //Subroutine: Change last column of matrix to account for velocity
@@ -565,10 +598,3 @@ function padeNextFrame(
   }
   return { spinePosition: pos, spineVel: vel };
 }
-console.log(InvertMatrix([
-  [1,0, 0,0],
-  [-3, 3, 0, 0],
-  [3, -6, 3, 0],
-  [-1, 3, -3, 1]
-]
-))
