@@ -313,8 +313,8 @@ class Spine {
   }
 }
 function updateSpine(spine, headforce, deltaTime, gtx, pushingColliders, shrinks) {
-  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 1000, gtx, pushingColliders, shrinks);
+  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime / 10));
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 100, gtx, pushingColliders, shrinks);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   return spine;
@@ -605,18 +605,12 @@ function shrinkPoints(spinePosition, bodyShape, gtx, pushingColliders, shrinks) 
     let collision = pushingColliders[b];
     let i3 = pushingColliders[b].index;
     let curve = Curve.fromBSpline(outline[i3], outline[(i3 + 1) % outline.length], outline[(i3 + 2) % outline.length], outline[(i3 + 3) % outline.length]);
-    let curveForces = backTrackCurve(detector.dir1Force(curve, collision.otherCurve, collision.t, collision.u)[0], i3).map((o) => !collision.add ? o : o.scale(-1));
+    let curveForces = backTrackCurve(detector.dir1Force(curve, collision.otherCurve, collision.t, collision.u)[0], i3).map((o) => collision.add ? o : o.scale(-1));
     skinForces[i3] = skinForces[i3].add(curveForces[0]);
     skinForces[(i3 + 1) % outline.length] = skinForces[(i3 + 1) % outline.length].add(curveForces[1]);
     skinForces[(i3 + 2) % outline.length] = skinForces[(i3 + 2) % outline.length].add(curveForces[2]);
     skinForces[(i3 + 3) % outline.length] = skinForces[(i3 + 3) % outline.length].add(curveForces[3]);
   }
-  gtx.lineStyle(2, 16711680);
-  for (var i2 = 0;i2 < bodyShape.length; i2++) {
-    gtx.moveTo(outline[i2].x, outline[i2].y);
-    gtx.lineTo(outline[i2].x + skinForces[i2].x, outline[i2].y + skinForces[i2].y);
-  }
-  gtx.stroke();
   let spineForces = Array(spinePosition.length).fill(Point.zero);
   for (var i2 = 0;i2 < skinForces.length; i2++) {
     let index = Math.floor(bodyShape[i2].index);
@@ -691,7 +685,7 @@ class detector {
     new Point(400, 550),
     new Point(450, 550),
     new Point(450, 500)
-  ].reverse();
+  ];
   static getCurveBoundingBoxes(inputBString) {
     let count = inputBString.length;
     let curves = [];
@@ -826,7 +820,7 @@ class detector {
   static solveCollision(curve1, curve2, i1 = [0, 1], i2 = [0, 1], depth = 5) {
     if (depth == 0) {
       let cr = curve1.value(curve1.coeff1Dir(), i1[0]).crossProduct(curve2.value(curve2.coeff1Dir(), i2[0]));
-      let add = cr > 0 ? true : false;
+      let add = cr < 0 ? true : false;
       return [{ i1: i1[0], i2: i2[0], add }];
     }
     let returner = [];
@@ -850,18 +844,22 @@ class detector {
     let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
     let uc = curve2.coeff();
     let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3];
-    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * t ** (i3 + j2)));
-    let tsd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => (j2 - i3) * t ** (i3 + j2 - 1) * arrTc[i3].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
-    let usd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * u ** (i3 + j2)));
-    let usd1 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => (j2 - i3) * u ** (i3 + j2 - 1) * arrUc[i3].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
+    let tsd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * t ** (i3 + j2)));
+    let tsd1 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) * t ** (i3 + j2 - 1) * arrTc[i3].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
+    let usd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * u ** (i3 + j2)));
+    let usd1 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) * u ** (i3 + j2 - 1) * arrUc[i3].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
     let c1dir = curve1.value(curve1.coeff1Dir(), t);
-    let c2dir = curve2.value(curve2.coeff1Dir(), t);
-    let curve1Weights = [(1 - t) ** 3, 3 * (1 - t) ** 2 * t, 3 * (1 - t) * t ** 2, t ** 3];
-    let curve2Weights = [(1 - u) ** 3, 3 * (1 - u) ** 2 * u, 3 * (1 - u) * u ** 2, u ** 3];
+    let c2dir = curve2.value(curve2.coeff1Dir(), u);
+    let curve1Weights = [1, t, t ** 2, t ** 3];
+    let curve2Weights = [1, u, u ** 2, u ** 3];
     let dirMat = [
       [-c1dir.x, c2dir.x],
       [-c1dir.y, c2dir.y]
     ];
+    let det = dirMat[0][0] * dirMat[1][1] - dirMat[0][1] * dirMat[1][0];
+    if (Math.abs(det) < 0.001) {
+      return Array(2).fill(Array(4).fill(Point.zero));
+    }
     let revDir = InvertMatrix(dirMat);
     let xtcrut = tsd0.map((o, i3) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i3]).reduce((a, b) => a + b));
     let ytcrut = tsd0.map((o, i3) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i3]).reduce((a, b) => a + b));
@@ -873,12 +871,15 @@ class detector {
       retT.push(new Point(xtcrut[i2], ytcrut[i2]));
       retU.push(new Point(xucrut[i2], yucrut[i2]));
     }
+    if (retT.some((o) => isNaN(o.x) || isNaN(o.y))) {
+      debugger;
+    }
     return [retT, retU];
   }
   static shrinkCurve(curve) {
     let tc = curve.coeff();
     let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
-    let tsd0 = Array(4).fill(Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2)));
+    let tsd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2)));
     let xtcrut = tsd0.map((o) => o.map((p, index) => p * -arrTc[index].y).reduce((a, b) => a + b));
     let ytcrut = tsd0.map((o) => o.map((p, index) => p * arrTc[index].x).reduce((a, b) => a + b));
     let ret = [];

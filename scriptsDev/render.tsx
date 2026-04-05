@@ -188,7 +188,6 @@ app.ticker.add((delta) => {
     }
   }
   }
-  console.log(shrinks);
   testSpine = updateSpine(testSpine, headForce, delta.deltaTime, gfx, pushingColliders, shrinks);
   lizardCharacters.updateArms(lizardCharacters.myCharacter, [
     "walk",
