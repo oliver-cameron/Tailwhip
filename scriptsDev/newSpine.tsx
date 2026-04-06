@@ -21,11 +21,11 @@ export function updateSpine(
   pushingColliders?: {index: number, t: number, u: number, otherCurve: Curve, add: boolean}[],
   shrinks?: number[]
 ): Spine {
-  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime /10));
+  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime));
   // spine.velocity[spine.velocity.length - 1] = spine.velocity[
   //   spine.velocity.length - 1
   // ].subtract(headforce.scale(deltaTime));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 100, gtx, pushingColliders, shrinks);
+  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 10, gtx, pushingColliders, shrinks);
   spine.points = update.spinePosition;
   spine.velocity = update.spineVel;
   return spine;
@@ -482,7 +482,7 @@ function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset:
       outline[(i+2)%outline.length],
       outline[(i+3)%outline.length]
     )
-    let curveForces = backTrackCurve(detector.shrinkCurve(curve), i);
+    let curveForces = backTrackCurve(detector.shrinkCurve(curve, 1), i);
     skinForces[i] = skinForces[i].add(curveForces[0]);
     skinForces[(i+1)%outline.length] = skinForces[(i+1)%outline.length].add(curveForces[1]);
     skinForces[(i+2)%outline.length] = skinForces[(i+2)%outline.length].add(curveForces[2]);
@@ -496,7 +496,7 @@ function shrinkPoints(spinePosition: Point[], bodyShape: {index: number, offset:
       outline[(i+2)%outline.length],
       outline[(i+3)%outline.length]
     )
-    let curveForces = backTrackCurve(detector.dir1Force(curve, collision.otherCurve, collision.t, collision.u)[0], i).map(o => collision.add ? o : o.scale(-1));
+    let curveForces = backTrackCurve(detector.shrinkCurve(curve, collision.t), i).map(o => collision.add ? o : o.scale(-1));
     skinForces[i] = skinForces[i].add(curveForces[0]);
     skinForces[(i+1)%outline.length] = skinForces[(i+1)%outline.length].add(curveForces[1]);
     skinForces[(i+2)%outline.length] = skinForces[(i+2)%outline.length].add(curveForces[2]);
@@ -542,8 +542,8 @@ function padeNextFrame(
   let shrinkY = shrink.map(o => o.y)
 ;
   for(var i = 0; i < n; i++){
-    V[i] -= shrinkX[i];
-    V[i + n] -= shrinkY[i];
+    V[i] -= shrinkX[i] * 50;
+    V[i + n] -= shrinkY[i] * 50;
   }
 
   //Subroutine: Change last column of matrix to account for velocity

@@ -239,80 +239,22 @@ export class detector {
     }
     return returner;
   }
-  // static dir1TU(
-  //   curve1: Curve,
-  //   curve2: Curve,
-  //   t: number,
-  //   u: number,
-  // ): number[][][]{
-  //   // Top down return structure: (x,y), (p0, p1, p2, p3), (t,u)
-  //   let curve1Weights = [(1-t)**3, 3*(1-t)**2*t, 3*(1-t)*t**2, t**3]
-  //   let curve2Weights = [(1-u)**3, 3*(1-u)**2*u, 3*(1-u)*u**2, u**3]
-  //   let curve1dir = curve1.value(curve1.coeff1Dir(), t)
-  //   let curve2dir = curve2.value(curve2.coeff2Dir(), u)
-  //   let dirMat = [
-  //     [-curve1dir.x, curve2dir.x],
-  //     [-curve1dir.y, curve2dir.y]
-  //   ]
-  //   let revDir = InvertMatrix(dirMat)
-   
-  // }
-  static dir1Force(
-    curve1: Curve,
-    curve2: Curve,
-    t: number,
-    u: number,
-  ): Point[][]{
-    let tc = curve1.coeff()
-    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3]
-    let uc = curve2.coeff()
-    let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3]
-    let tsd0 = Array.from({length: 4}, () => Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j) * (t ** (i+j))))
-    let tsd1 = Array.from({length: 4}, () => Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) * t ** (i+j - 1) * arrTc[i].x * arrTc[j].y)).flat().reduce((a,b) => a+b)
-    
-    let usd0 = Array.from({length: 4}, () => Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j) * u ** (i+j)))
-    let usd1 = Array.from({length: 4}, () => Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) * u ** (i+j - 1) * arrUc[i].x * arrUc[j].y)).flat().reduce((a,b) => a+b)
-    let c1dir = curve1.value(curve1.coeff1Dir(), t)
-    let c2dir = curve2.value(curve2.coeff1Dir(), u)
-    let curve1Weights = [1, t, t**2, t**3]
-    let curve2Weights = [1, u, u**2, u**3]
-    let dirMat = [
-      [-c1dir.x, c2dir.x],
-      [-c1dir.y, c2dir.y]
-    ]
-    // check determinant of dirmat if zero return zero force
-    let det = dirMat[0][0] * dirMat[1][1] - dirMat[0][1] * dirMat[1][0]
-    if(Math.abs(det) < 0.001){
-      return Array(2).fill(Array(4).fill(Point.zero))
-    }
-    let revDir = InvertMatrix(dirMat)
-    let xtcrut = tsd0.map((o, i) => o.map((p, index) => -arrTc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] *  curve1Weights[i] ).reduce((a,b) => a+b))
-    let ytcrut = tsd0.map((o, i) => o.map((p, index) => arrTc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *   curve1Weights[i] ).reduce((a,b) => a+b))
-    let xucrut = usd0.map((o, i) => o.map((p, index) => -arrUc[index].y * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i] ).reduce((a,b) => a+b))
-    let yucrut = usd0.map((o, i) => o.map((p, index) => arrUc[index].x * p).reduce((a,b) => a+b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] *  -curve2Weights[i] ).reduce((a,b) => a+b))
-    let retT: Point[] = []
-    let retU: Point[] = []
-    for(var i = 0; i < 4; i++){
-      retT.push(new Point(xtcrut[i], ytcrut[i]))
-      retU.push(new Point(xucrut[i], yucrut[i]))
-    }
-    if(retT.some(o => isNaN(o.x) || isNaN(o.y))){
-      debugger;
-    }
-    return [retT, retU]
-  }
-  static shrinkCurve(curve: Curve):Point[]{
-    
+  static shrinkCurve(curve: Curve, t: number):Point[]{
+
     let tc = curve.coeff()
-    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3]
-    let tsd0 = Array.from({length: 4}, () => Array(4).fill(0)).map((o, j) => o.map((p,i) => (i+j == 0) ? 0 : (j-i) / (i+j)))
-    let xtcrut = tsd0.map(o =>o.map((p, index: number) => p * -arrTc[index].y).reduce((a,b) => a+b) )
-    let ytcrut = tsd0.map(o =>o.map((p, index: number) => p * arrTc[index].x).reduce((a,b) => a+b) )
-    let ret: Point[] = []
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3].map(o => new Point(o.y, -o.x))
+    let returner: Point[] = []
     for(var i = 0; i < 4; i++){
-      ret.push(new Point(xtcrut[i], ytcrut[i]))
+      let force = Point.zero;
+      for(var j = 0; j < 4; j++){
+        if(i+j == 0){
+          continue;
+        }
+        force = force.add(arrTc[j].scale(t ** (i + j) * j / (i + j)))
+      }
+      returner.push(force)
     }
-    return ret;
+    return returner;
   }
 }
 

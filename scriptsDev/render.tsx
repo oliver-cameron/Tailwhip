@@ -67,11 +67,11 @@ app.ticker.add((delta) => {
   }
   // Update spine
   gfx.clear();
-  gfx.lineStyle(4, 0x000001, 1);
-  gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
-  for (let i = 1; i < testSpine.points.length; i++) {
-    gfx.lineTo(testSpine.points[i].x, testSpine.points[i].y);
-  }
+  // gfx.lineStyle(4, 0x000001, 1);
+  // gfx.moveTo(testSpine.points[0].x, testSpine.points[0].y);
+  // for (let i = 1; i < testSpine.points.length; i++) {
+  //   gfx.lineTo(testSpine.points[i].x, testSpine.points[i].y);
+  // }
   // gfx.closePath();
   gfx.stroke();
   lizardCharacters.myCharacter.spine = testSpine.points;
@@ -86,7 +86,7 @@ app.ticker.add((delta) => {
       outline[(i + 2) % outline.length],
     );
   }
-  gfx.closePath();
+  // gfx.closePath();
   gfx.stroke();
   // Draw Blob
   gfx.lineStyle(2, 0x00ff00, 1);
@@ -104,50 +104,50 @@ app.ticker.add((delta) => {
 
   // Lizard Character draw bounding box
   let lizBox = detector.getCurveBoundingBoxes(outline);
-  gfx.lineStyle(1, 0xffff00, 1);
-  for (var i = 0; i < lizBox.length; i++) {
-    let curBox = lizBox[i];
-    gfx.moveTo(curBox[0].x, curBox[0].y);
-    gfx.lineTo(curBox[1].x, curBox[0].y);
-    gfx.lineTo(curBox[1].x, curBox[1].y);
-    gfx.lineTo(curBox[0].x, curBox[1].y);
-    gfx.lineTo(curBox[0].x, curBox[0].y);
-  }
-  gfx.stroke();
+  // gfx.lineStyle(1, 0xffff00, 1);
+  // for (var i = 0; i < lizBox.length; i++) {
+  //   let curBox = lizBox[i];
+  //   gfx.moveTo(curBox[0].x, curBox[0].y);
+  //   gfx.lineTo(curBox[1].x, curBox[0].y);
+  //   gfx.lineTo(curBox[1].x, curBox[1].y);
+  //   gfx.lineTo(curBox[0].x, curBox[1].y);
+  //   gfx.lineTo(curBox[0].x, curBox[0].y);
+  // }
+  // gfx.stroke();
 
   // Blob draw bounding box
   // Lizard Character draw bounding box
   let blobBox = detector.getCurveBoundingBoxes(blob);
-  gfx.lineStyle(1, 0xffff00, 1);
-  for (var i = 0; i < blobBox.length; i++) {
-    let curBox = blobBox[i];
-    gfx.moveTo(curBox[0].x, curBox[0].y);
-    gfx.lineTo(curBox[1].x, curBox[0].y);
-    gfx.lineTo(curBox[1].x, curBox[1].y);
-    gfx.lineTo(curBox[0].x, curBox[1].y);
-    gfx.lineTo(curBox[0].x, curBox[0].y);
-  }
-  gfx.stroke();
+  // gfx.lineStyle(1, 0xffff00, 1);
+  // for (var i = 0; i < blobBox.length; i++) {
+  //   let curBox = blobBox[i];
+  //   gfx.moveTo(curBox[0].x, curBox[0].y);
+  //   gfx.lineTo(curBox[1].x, curBox[0].y);
+  //   gfx.lineTo(curBox[1].x, curBox[1].y);
+  //   gfx.lineTo(curBox[0].x, curBox[1].y);
+  //   gfx.lineTo(curBox[0].x, curBox[0].y);
+  // }
+  // gfx.stroke();
   // Find collisions
   let collisionIndecies = detector.AABB(lizBox, blobBox);
-  gfx.lineStyle(1, 0xff0000, 1);
-  for (var i = 0; i < collisionIndecies.length; i++) {
-    let collisionIndex = collisionIndecies[i];
-    let curBox1 = lizBox[collisionIndex[0]];
-    gfx.moveTo(curBox1[0].x, curBox1[0].y);
-    gfx.lineTo(curBox1[1].x, curBox1[0].y);
-    gfx.lineTo(curBox1[1].x, curBox1[1].y);
-    gfx.lineTo(curBox1[0].x, curBox1[1].y);
-    gfx.lineTo(curBox1[0].x, curBox1[0].y);
+  // gfx.lineStyle(1, 0xff0000, 1);
+  // for (var i = 0; i < collisionIndecies.length; i++) {
+  //   let collisionIndex = collisionIndecies[i];
+  //   let curBox1 = lizBox[collisionIndex[0]];
+  //   gfx.moveTo(curBox1[0].x, curBox1[0].y);
+  //   gfx.lineTo(curBox1[1].x, curBox1[0].y);
+  //   gfx.lineTo(curBox1[1].x, curBox1[1].y);
+  //   gfx.lineTo(curBox1[0].x, curBox1[1].y);
+  //   gfx.lineTo(curBox1[0].x, curBox1[0].y);
 
-    let curBox2 = blobBox[collisionIndex[1]];
-    gfx.moveTo(curBox2[0].x, curBox2[0].y);
-    gfx.lineTo(curBox2[1].x, curBox2[0].y);
-    gfx.lineTo(curBox2[1].x, curBox2[1].y);
-    gfx.lineTo(curBox2[0].x, curBox2[1].y);
-    gfx.lineTo(curBox2[0].x, curBox2[0].y);
-  }
-  gfx.stroke();
+  //   let curBox2 = blobBox[collisionIndex[1]];
+  //   gfx.moveTo(curBox2[0].x, curBox2[0].y);
+  //   gfx.lineTo(curBox2[1].x, curBox2[0].y);
+  //   gfx.lineTo(curBox2[1].x, curBox2[1].y);
+  //   gfx.lineTo(curBox2[0].x, curBox2[1].y);
+  //   gfx.lineTo(curBox2[0].x, curBox2[0].y);
+  // }
+  // gfx.stroke();
   // Now, draw circles at collision points. Only need to draw circles for lizard, as they are collisions and should be the same points on the blob
   // But good to check anyway
   let collisions: {t: number, u: number, add: boolean}[] = [];
@@ -167,13 +167,13 @@ app.ticker.add((delta) => {
     );
     let collisionPoints = detector.solveCollision(curve1, curve2);
     collisions.push(...collisionPoints.map(o => ({t: o.i1 + collisionIndex[0], u: o.i2 + collisionIndex[1], add: o.add}))); 
-    for (var j = 0; j < collisionPoints.length; j++) {
-      let collisionT = collisionPoints[j];
-      let collisionPoint = curve1.value(curve1.coeff(), collisionT.i1);
-      gfx.beginFill(0xffaa44, 1);
-      gfx.drawCircle(collisionPoint.x, collisionPoint.y, 5);
-      gfx.endFill();
-    }
+    // for (var j = 0; j < collisionPoints.length; j++) {
+    //   let collisionT = collisionPoints[j];
+    //   let collisionPoint = curve1.value(curve1.coeff(), collisionT.i1);
+    //   gfx.beginFill(0xffaa44, 1);
+    //   gfx.drawCircle(collisionPoint.x, collisionPoint.y, 5);
+    //   gfx.endFill();
+    // }
   }
   // And now we can add a collider between the lizard and the blob at these collision points, and see how it reacts to forces and stuff. This is the basis for the "gameplay" of the game, as the player will be trying to get the blob to collide with the lizard in certain ways to achieve certain goals. For now, we can just draw circles at the collision points and make them repel each other or something.
   // First, fill a list of "shrinks" unaccounted by the collisions, where we have missing upper endpoint to the area integral. This will be between all integer t values between a true value and the next consecutive false value.
@@ -182,7 +182,7 @@ app.ticker.add((delta) => {
   if(collisions.length > 0){
   collisions.sort((a, b) => a.t - b.t);
   for(var i = 0; i < outline.length; i++){
-    let first = collisions.findIndex(o => o.t > i);
+    let first = collisions.findIndex(o => o.t > (i + 1) % outline.length);
     if(collisions[first == -1 ? 0 : first].add == false){
       shrinks.push(i);
     }
@@ -195,9 +195,6 @@ app.ticker.add((delta) => {
     "walk",
     "walk",
   ]);
-  gfx.lineStyle(1, 0x000010, 1);
-  gfx.moveTo(0, 0);
-  gfx.lineTo(100, 100);
   gfx.closePath();
   gfx.stroke();
 });

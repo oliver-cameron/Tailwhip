@@ -159,517 +159,6 @@ var other = {
 };
 var geo_default = { Point, Curve, other };
 
-// scriptsDev/lizard.tsx
-class Lizard {
-  static dub = (p) => {
-    return p.concat(p.map((o) => ({
-      index: o.index,
-      offset: new Point(o.offset.x, -o.offset.y)
-    })).reverse());
-  };
-  id;
-  spine;
-  vel;
-  arms;
-  bodyShape;
-  spineLength = 6;
-  constructor(id, spine, arms, bodyShape) {
-    this.id = id;
-    this.spine = spine;
-    this.arms = arms;
-    this.bodyShape = bodyShape;
-    this.vel = {
-      oldPoints: spine,
-      velocitySpine: Array(spine.length).fill(Point.zero)
-    };
-  }
-}
-var spineAmount = 6;
-var lizardCharacters = {
-  lineLength: 50,
-  limbLength: 40,
-  limbDefs: [
-    {
-      index: 1,
-      baseOffset: new Point(0, -15),
-      handOffset: new Point(-5, -60),
-      clockwise: false
-    },
-    {
-      index: 1,
-      baseOffset: new Point(0, 15),
-      handOffset: new Point(5, 60),
-      clockwise: true
-    },
-    {
-      index: 3,
-      baseOffset: new Point(0, -5),
-      handOffset: new Point(-5, -50),
-      clockwise: true
-    },
-    {
-      index: 3,
-      baseOffset: new Point(0, 5),
-      handOffset: new Point(5, 50),
-      clockwise: false
-    }
-  ],
-  myCharacter: new Lizard(crypto.randomUUID(), Array(spineAmount).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Array(4).fill(0).map(() => new Point(Math.random() + 100, Math.random() + 100)), Lizard.dub([
-    { index: 4.99, offset: new Point(50, 4) },
-    { index: 4, offset: new Point(0, 7) },
-    { index: 3, offset: new Point(0, 10) },
-    { index: 2, offset: new Point(-15, 20) },
-    { index: 1, offset: new Point(0, 16) },
-    { index: 0, offset: new Point(0, 20) },
-    { index: 0, offset: new Point(-20, 10) }
-  ])),
-  others: {},
-  updateSpine(lizard, direction, origin, deltaT) {
-    let newSpine = lizard.spine;
-    newSpine[0] = newSpine[0].add(direction.scale(deltaT.deltaTime) ?? Point.zero);
-    for (var i = 1;i < newSpine.length; i++) {
-      newSpine[i] = newSpine[i].add(lizard.vel.velocitySpine[i].scale(deltaT.deltaTime).scale(0.9));
-    }
-    for (var i = 2;i < newSpine.length; i++) {
-      newSpine[i] = other.spring(newSpine[i - 2], newSpine[i - 1], newSpine[i], 0.5, 0.1, deltaT.deltaTime);
-    }
-    for (var i = 1;i < newSpine.length; i++) {
-      newSpine[i] = other.lockDist(newSpine[i - 1], newSpine[i], this.lineLength);
-    }
-    for (var i = 0;i < newSpine.length; i++) {
-      lizard.vel.velocitySpine[i] = newSpine[i].subtract(lizard.spine[i]).scale(1 / deltaT.deltaTime);
-    }
-    this.myCharacter.spine = newSpine;
-    return newSpine;
-  },
-  toBodySpace(index, point) {
-    let bodyPoint = this.myCharacter.spine[index];
-    let secant = this.myCharacter.spine[index == spineAmount - 1 ? index : index + 1].subtract(this.myCharacter.spine[index == 0 ? index : index - 1]);
-    return other.toBSpace(point, bodyPoint, secant.normalise());
-  },
-  fromBodySpace(index, point) {
-    let t = index % 1;
-    let seg = Math.floor(index);
-    let p0 = seg == 0 ? this.myCharacter.spine[0].scale(2).subtract(this.myCharacter.spine[1]) : this.myCharacter.spine[seg - 1];
-    let p1 = this.myCharacter.spine[seg];
-    let p2 = this.myCharacter.spine[seg + 1];
-    let p3 = seg == spineAmount - 2 ? this.myCharacter.spine[spineAmount - 1].scale(2).subtract(this.myCharacter.spine[spineAmount - 2]) : this.myCharacter.spine[seg + 2];
-    let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
-    let curvePoint = curCurve.value(curCurve.coeff(), t);
-    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / this.lineLength);
-    let normal = new Point(-secant.y, secant.x);
-    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
-  },
-  updateArms(lizard, states) {
-    let newArms = lizard.arms;
-    for (var i = 0;i < 4; i++) {
-      if (newArms[i].subtract(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset)).length() >= this.limbLength * 2) {
-        newArms[i] = other.lockDist(this.fromBodySpace(this.limbDefs[i].index, this.limbDefs[i].baseOffset), newArms[i], this.limbLength * 2);
-      }
-    }
-    this.myCharacter.arms = newArms;
-    return newArms;
-  },
-  draw(lizard, ctx) {
-    ctx.lineStyle(4, 65536, 1);
-    ctx.moveTo(lizard.spine[0].x, lizard.spine[0].y);
-    for (var i = 1;i < lizard.spine.length; i++) {
-      ctx.lineTo(lizard.spine[i].x, lizard.spine[i].y);
-    }
-    ctx.stroke();
-    ctx.lineStyle(2, 16711935, 1);
-    for (var i = 0;i < 4; i++) {
-      let limbDef = this.limbDefs[i];
-      let base = this.fromBodySpace(limbDef.index, limbDef.baseOffset);
-      let hand = lizard.arms[i];
-      let joint = other.inverseKinematics(base, hand, limbDef.clockwise, this.limbLength);
-      ctx.moveTo(base.x, base.y);
-      ctx.lineTo(joint.x, joint.y);
-      ctx.lineTo(hand.x, hand.y);
-      ctx.stroke();
-    }
-    let bodyShapePoints = lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
-    ctx.lineStyle(3, 65280, 1);
-    ctx.moveTo(bodyShapePoints[0].x, bodyShapePoints[0].y);
-    for (var i = 1;i < bodyShapePoints.length; i++) {
-      ctx.lineTo(bodyShapePoints[i].x, bodyShapePoints[i].y);
-    }
-    ctx.closePath();
-    ctx.stroke();
-  },
-  outline(lizard) {
-    return lizard.bodyShape.map((def) => this.fromBodySpace(def.index, def.offset));
-  }
-};
-var lizard_default = { lizardCharacters, Lizard };
-
-// scriptsDev/newSpine.tsx
-class Spine {
-  points;
-  velocity;
-  constructor(points) {
-    this.points = points;
-    this.velocity = Array(points.length).fill(Point.zero);
-  }
-}
-function updateSpine(spine, headforce, deltaTime, gtx, pushingColliders, shrinks) {
-  spine.velocity[0] = spine.velocity[0].add(headforce.scale(deltaTime / 10));
-  let update = padeNextFrame(spine.points, spine.velocity, deltaTime / 100, gtx, pushingColliders, shrinks);
-  spine.points = update.spinePosition;
-  spine.velocity = update.spineVel;
-  return spine;
-}
-function multiplyMatrices(lhs, rhs) {
-  let lhsHeight = lhs[0].length;
-  for (var i = 0;i < lhs.length; i++) {
-    if (lhs[i].length != lhsHeight) {
-      throw new Error("LHS is not a valid matrix");
-    }
-  }
-  let rhsHeight = rhs[0].length;
-  for (var i = 0;i < rhs.length; i++) {
-    if (rhs[i].length != rhsHeight) {
-      throw new Error("RHS is not a valid matrix");
-    }
-  }
-  if (lhsHeight != rhs.length) {
-    throw new Error("Matrix dimensions do not match");
-  }
-  let returner = Array.from({ length: lhs.length }, () => Array(rhs[0].length).fill(0));
-  for (var i = 0;i < lhs.length; i++) {
-    for (var j = 0;j < rhs[0].length; j++) {
-      let sum = 0;
-      for (var k = 0;k < lhsHeight; k++) {
-        sum += lhs[i][k] * rhs[k][j];
-      }
-      returner[i][j] = sum;
-    }
-  }
-  return returner;
-}
-function LUDecompose(Matrix) {
-  let n = Matrix.length;
-  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i) => row.map((val, j) => i === j ? 1 : 0));
-  let U = multiplyMatrices(L, Matrix);
-  for (let i = 0;i < n; i++) {
-    for (let j = i + 1;j < n; j++) {
-      let div = U[j][i] / U[i][i];
-      L[j][i] = div;
-      for (let k = i;k < n; k++) {
-        U[j][k] -= div * U[i][k];
-      }
-    }
-  }
-  return { L, U };
-}
-function factorial(n) {
-  if (n % 1 !== 0) {
-    Error("Fractional factorial not implemented");
-  }
-  if (n < 0) {
-    Error("Negative factorial not defined");
-  } else if (n === 0 || n === 1) {
-    return 1;
-  } else {
-    return n * factorial(n - 1);
-  }
-}
-function matrixAddition(lhs, rhs) {
-  return lhs.map((row, i) => row.map((val, j) => val + rhs[i][j]));
-}
-function padeApproximation(Matrix, order) {
-  let size = Matrix.length;
-  for (var i = 0;i < size; i++) {
-    if (Matrix[i].length != size) {
-      throw new Error("Matrix is not square");
-    }
-  }
-  let absMat = Matrix.map((row) => row.map((x2) => Math.abs(x2)).reduce((a, b) => a + b)).reduce((a, b) => a > b ? a : b);
-  let scalar = absMat > 1 ? Math.ceil(Math.log2(absMat)) : 0;
-  let deltaMat = Matrix.map((row) => row.map((x2) => x2 / 2 ** scalar));
-  let powerCache = [
-    Array.from({ length: size }, () => Array(size).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0))
-  ];
-  let coefficients = [1];
-  for (let i2 = 1;i2 <= order; i2++) {
-    powerCache.push(multiplyMatrices(powerCache[i2 - 1], deltaMat));
-    coefficients.push(factorial(order * 2 - i2) * factorial(order) / (factorial(order * 2) * factorial(i2) * factorial(order - i2)));
-  }
-  let numerator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index]))).reduce((a, b) => matrixAddition(a, b));
-  let denominator = powerCache.map((i2, index) => i2.map((row) => row.map((val) => val * coefficients[index] * (index % 2 === 0 ? 1 : -1)))).reduce((a, b) => matrixAddition(a, b));
-  let { L, U } = LUDecompose(denominator);
-  let x = Array.from({ length: size }, () => Array(size).fill(0));
-  for (var v = 0;v < size; v++) {
-    let y = Array(size).fill(0).map(() => 0);
-    for (var i = 0;i < size; i++) {
-      let sum = numerator[i][v];
-      if (i !== 0) {
-        for (var j = 0;j < i; j++) {
-          sum -= L[i][j] * y[j];
-        }
-      }
-      y[i] = sum / L[i][i];
-    }
-    for (var i = size - 1;i >= 0; i--) {
-      let sum = y[i];
-      for (var j = i + 1;j < size; j++) {
-        sum -= U[i][j] * x[j][v];
-      }
-      x[i][v] = sum / U[i][i];
-    }
-  }
-  for (var i = 0;i < scalar; i++) {
-    x = multiplyMatrices(x, x);
-  }
-  return x;
-}
-function InvertMatrix(matrix) {
-  let n = matrix.length;
-  for (var i = 0;i < n; i++) {
-    if (matrix[i].length != n) {
-      throw new Error("Matrix is not square");
-    }
-  }
-  let L = Array.from({ length: n }, () => Array(n).fill(0)).map((row, i2) => row.map((val, j2) => i2 === j2 ? 1 : 0));
-  for (var i = 0;i < n; i++) {
-    for (var j = i + 1;j < n; j++) {
-      let scale = matrix[j][i] / matrix[i][i];
-      for (var k = 0;k < n; k++) {
-        matrix[j][k] -= scale * matrix[i][k];
-        L[j][k] -= scale * L[i][k];
-      }
-    }
-  }
-  for (var i = n - 1;i >= 0; i--) {
-    for (var j = n - 1;j > i; j--) {
-      let scale = matrix[j][i] / matrix[i][i];
-      for (var k = 0;k < n; k++) {
-        matrix[j][k] -= scale * matrix[i][k];
-        L[j][k] -= scale * L[i][k];
-      }
-    }
-  }
-  for (var i = 0;i < n; i++) {
-    for (var j = 0;j < n; j++) {
-      L[i][j] /= matrix[i][i];
-    }
-  }
-  return L;
-}
-var bodyLineLength = 50;
-var springForces = [
-  {
-    coefficients: [1 / 9, 11 / 54, -10 / 27, 1 / 18],
-    targetLength: bodyLineLength * 10 / 27,
-    stiffness: 50
-  },
-  {
-    coefficients: [-1 / 18, 23 / 54, -23 / 54, 1 / 18],
-    targetLength: bodyLineLength * 7 / 27,
-    stiffness: 50
-  },
-  {
-    coefficients: [-1 / 18, 10 / 27, -11 / 54, -1 / 9],
-    targetLength: bodyLineLength * 10 / 27,
-    stiffness: 50
-  }
-];
-var pointAmount = 6;
-var springData = [{ coefficients: [], targetLength: 0, stiffness: 0 }];
-for (i = 0;i < springForces.length; i++) {
-  for (j = 0;j < pointAmount - 3; j++) {
-    let coeffRow = Array(pointAmount).fill(0);
-    coeffRow.splice(j, 4, ...springForces[i].coefficients);
-    springData.push({
-      coefficients: coeffRow,
-      targetLength: springForces[i].targetLength,
-      stiffness: springForces[i].stiffness
-    });
-  }
-  let coeffRowStart = Array(pointAmount).fill(0);
-  let startCoeffs = [...springForces[i].coefficients];
-  startCoeffs[1] += startCoeffs[0] * 2;
-  startCoeffs[2] -= startCoeffs[0];
-  coeffRowStart.splice(0, 3, ...startCoeffs.slice(1));
-  springData.push({
-    coefficients: coeffRowStart,
-    targetLength: springForces[i].targetLength,
-    stiffness: springForces[i].stiffness
-  });
-  let coeffRowEnd = Array(pointAmount).fill(0);
-  let endCoeffs = [...springForces[i].coefficients];
-  endCoeffs[endCoeffs.length - 3] -= endCoeffs[endCoeffs.length - 1];
-  endCoeffs[endCoeffs.length - 2] += endCoeffs[endCoeffs.length - 1] * 2;
-  coeffRowEnd.splice(pointAmount - 3, 3, ...endCoeffs.slice(0, endCoeffs.length - 1));
-  springData.push({
-    coefficients: coeffRowEnd,
-    targetLength: springForces[i].targetLength,
-    stiffness: springForces[i].stiffness
-  });
-}
-var j;
-var i;
-springData = springData.slice(1);
-function bodySprings(spinePosition) {
-  let n = spinePosition.length;
-  let F = new Array(2 * n).fill(0).map(() => new Array(2 * n).fill(0));
-  let V = new Array(2 * n).fill(0).map(() => 0);
-  for (var i2 = 0;i2 < springData.length; i2++) {
-    let coeffs = springData[i2].coefficients;
-    let targetLength = springData[i2].targetLength;
-    let stiffness = springData[i2].stiffness;
-    let S = coeffs.map((o, index) => spinePosition[index].scale(o)).reduce((a2, b2) => a2.add(b2));
-    let invSlen = 1 / S.length();
-    let sLenNeg3 = invSlen ** 3;
-    let tslen = targetLength * invSlen;
-    let xv = coeffs.map((o) => -2 * stiffness * o * S.x * (1 - tslen));
-    for (var j2 = 0;j2 < n; j2++) {
-      V[j2] += xv[j2];
-    }
-    let yv = coeffs.map((o) => -2 * stiffness * o * S.y * (1 - tslen));
-    for (var j2 = 0;j2 < n; j2++) {
-      V[j2 + n] += yv[j2];
-    }
-    let tsxl = targetLength * sLenNeg3 * S.x * S.x;
-    for (var a = 0;a < n; a++) {
-      for (var b = 0;b < n; b++) {
-        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsxl);
-        F[a][b] += addVal;
-      }
-    }
-    let tsyl = targetLength * sLenNeg3 * S.y * S.y;
-    for (var a = 0;a < n; a++) {
-      for (var b = 0;b < n; b++) {
-        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * (1 - tslen + tsyl);
-        F[a + n][b + n] += addVal;
-      }
-    }
-    let tsxy = targetLength * sLenNeg3 * S.x * S.y;
-    for (var a = 0;a < n; a++) {
-      for (var b = 0;b < n; b++) {
-        let addVal = -2 * stiffness * coeffs[a] * coeffs[b] * tsxy;
-        F[a][b + n] += addVal;
-        F[a + n][b] += addVal;
-      }
-    }
-  }
-  return { F, V };
-}
-function backTrackCurve(forces, index) {
-  let p3 = forces[3].scale(1).add(forces[2].scale(0)).add(forces[1].scale(0)).add(forces[0].scale(0)).scale(1 / 6);
-  let p2 = forces[3].scale(-3).add(forces[2].scale(3)).add(forces[1].scale(3)).add(forces[0].scale(1)).scale(1 / 6);
-  let p1 = forces[3].scale(3).add(forces[2].scale(-6)).add(forces[1].scale(0)).add(forces[0].scale(4)).scale(1 / 6);
-  let p0 = forces[3].scale(-1).add(forces[2].scale(3)).add(forces[1].scale(-3)).add(forces[0].scale(1)).scale(1 / 6);
-  return [p0, p1, p2, p3];
-}
-function backTrackPoint(point, index, bodyShape) {
-  let bodyPoint = new Point(point.y, -point.x).scale(bodyShape.y).add(point.scale(bodyShape.x)).scale(1 / lizardCharacters.lineLength);
-  let t = index % 1;
-  let weightPos = [-3 * t ** 3 + 6 * t ** 2 - 3 * t, 5 * t ** 3 - 9 * t ** 2 + 4, -5 * t ** 3 + 6 * t ** 2 + 3 * t, 3 * t ** 3 - 3 * t ** 2].map((o) => o / 4);
-  let dirPos = [-9 * t ** 2 + 12 * t - 3, 15 * t ** 2 - 18 * t, -15 * t ** 2 + 12 * t + 3, 9 * t ** 2 - 6 * t].map((o) => o / 4);
-  let p0 = point.scale(weightPos[0]).add(bodyPoint.scale(dirPos[0]));
-  let p1 = point.scale(weightPos[1]).add(bodyPoint.scale(dirPos[1]));
-  let p2 = point.scale(weightPos[2]).add(bodyPoint.scale(dirPos[2]));
-  let p3 = point.scale(weightPos[3]).add(bodyPoint.scale(dirPos[3]));
-  return [p0, p1, p2, p3];
-}
-function shrinkPoints(spinePosition, bodyShape, gtx, pushingColliders, shrinks) {
-  let n = spinePosition.length;
-  let skinForces = Array(bodyShape.length).fill(Point.zero);
-  let outline = bodyShape.map((o) => {
-    let index = o.index;
-    let point = o.offset;
-    let spineAmount2 = n;
-    let t = index % 1;
-    let seg = Math.floor(index);
-    let p0 = seg == 0 ? spinePosition[0].scale(2).subtract(spinePosition[1]) : spinePosition[seg - 1];
-    let p1 = spinePosition[seg];
-    let p2 = spinePosition[seg + 1];
-    let p3 = seg == spineAmount2 - 2 ? spinePosition[spineAmount2 - 1].scale(2).subtract(spinePosition[spineAmount2 - 2]) : spinePosition[seg + 2];
-    let curCurve = Curve.fromKSpline(p0, p1, p2, p3);
-    let curvePoint = curCurve.value(curCurve.coeff(), t);
-    let secant = curCurve.value(curCurve.coeff1Dir(), t).scale(1 / lizardCharacters.lineLength);
-    let normal = new Point(-secant.y, secant.x);
-    return curvePoint.add(secant.scale(point.x)).add(normal.scale(point.y));
-  });
-  for (var b = 0;b < shrinks.length; b++) {
-    let i3 = shrinks[b];
-    let curve = Curve.fromBSpline(outline[i3], outline[(i3 + 1) % outline.length], outline[(i3 + 2) % outline.length], outline[(i3 + 3) % outline.length]);
-    let curveForces = backTrackCurve(detector.shrinkCurve(curve), i3);
-    skinForces[i3] = skinForces[i3].add(curveForces[0]);
-    skinForces[(i3 + 1) % outline.length] = skinForces[(i3 + 1) % outline.length].add(curveForces[1]);
-    skinForces[(i3 + 2) % outline.length] = skinForces[(i3 + 2) % outline.length].add(curveForces[2]);
-    skinForces[(i3 + 3) % outline.length] = skinForces[(i3 + 3) % outline.length].add(curveForces[3]);
-  }
-  for (var b = 0;b < pushingColliders.length; b++) {
-    let collision = pushingColliders[b];
-    let i3 = pushingColliders[b].index;
-    let curve = Curve.fromBSpline(outline[i3], outline[(i3 + 1) % outline.length], outline[(i3 + 2) % outline.length], outline[(i3 + 3) % outline.length]);
-    let curveForces = backTrackCurve(detector.dir1Force(curve, collision.otherCurve, collision.t, collision.u)[0], i3).map((o) => collision.add ? o : o.scale(-1));
-    skinForces[i3] = skinForces[i3].add(curveForces[0]);
-    skinForces[(i3 + 1) % outline.length] = skinForces[(i3 + 1) % outline.length].add(curveForces[1]);
-    skinForces[(i3 + 2) % outline.length] = skinForces[(i3 + 2) % outline.length].add(curveForces[2]);
-    skinForces[(i3 + 3) % outline.length] = skinForces[(i3 + 3) % outline.length].add(curveForces[3]);
-  }
-  let spineForces = Array(spinePosition.length).fill(Point.zero);
-  for (var i2 = 0;i2 < skinForces.length; i2++) {
-    let index = Math.floor(bodyShape[i2].index);
-    let pointForces = backTrackPoint(skinForces[i2], bodyShape[i2].index, bodyShape[i2].offset);
-    if (index > 0 && index < spinePosition.length - 2) {
-      spineForces[index - 1] = spineForces[index - 1].add(pointForces[0]);
-      spineForces[index] = spineForces[index].add(pointForces[1]);
-      spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]);
-      spineForces[index + 2] = spineForces[index + 2].add(pointForces[3]);
-    } else if (index == 0) {
-      spineForces[0] = spineForces[0].add(pointForces[1].add(pointForces[0].scale(2)));
-      spineForces[1] = spineForces[1].add(pointForces[2]).subtract(pointForces[0]);
-      spineForces[2] = spineForces[2].add(pointForces[3]);
-    } else {
-      spineForces[index - 1] = spineForces[index - 1].add(pointForces[0]);
-      spineForces[index] = spineForces[index].add(pointForces[1]).subtract(pointForces[3]);
-      spineForces[index + 1] = spineForces[index + 1].add(pointForces[2]).add(pointForces[3].scale(2));
-    }
-  }
-  return spineForces;
-}
-function padeNextFrame(spinePosition, spineVel, delta, gtx, pushingColliders, shrinks) {
-  let n = spinePosition.length;
-  let { F, V } = bodySprings(spinePosition);
-  let shrink = shrinkPoints(spinePosition, lizardCharacters.myCharacter.bodyShape, gtx, pushingColliders, shrinks);
-  let shrinkX = shrink.map((o) => o.x);
-  let shrinkY = shrink.map((o) => o.y);
-  for (var i2 = 0;i2 < n; i2++) {
-    V[i2] -= shrinkX[i2];
-    V[i2 + n] -= shrinkY[i2];
-  }
-  let shiftPos = spinePosition.map((o) => [[[o.x]], [[o.y]]]).reduce((a, b) => [a[0].concat(b[0]), a[1].concat(b[1])]);
-  let acc = multiplyMatrices(F, shiftPos[0].concat(shiftPos[1])).map((o) => o[0]);
-  for (var i2 = 0;i2 < 2 * n; i2++) {
-    V[i2] -= acc[i2];
-  }
-  let identityMatrix = Array.from({ length: 2 * n }, () => Array(2 * n).fill(0)).map((row, i3) => row.map((val, j2) => i3 === j2 ? 1 : 0));
-  let builtMatrix = [[]];
-  let zeroN = Array.from({ length: 2 * n }, () => 0);
-  for (var i2 = 0;i2 < 2 * n; i2++) {
-    builtMatrix.push(zeroN.concat(identityMatrix[i2]).concat([0]));
-  }
-  for (var i2 = 0;i2 < 2 * n; i2++) {
-    builtMatrix.push(F[i2].concat(identityMatrix[i2].map((val) => val * -1)).concat([V[i2]]));
-  }
-  builtMatrix.push(zeroN.concat(zeroN).concat(0));
-  builtMatrix = builtMatrix.slice(1).map((o) => o.map((k) => k * delta));
-  let a0 = spinePosition.map((o) => o.x).concat(spinePosition.map((o) => o.y)).concat(spineVel.map((o) => o.x)).concat(spineVel.map((o) => o.y)).concat([1]).map((o) => [o]);
-  let newMatrix = padeApproximation(builtMatrix, 5);
-  let answer = multiplyMatrices(newMatrix, a0).map((o) => o[0]);
-  var pos = [];
-  var vel = [];
-  for (var i2 = 0;i2 < n; i2++) {
-    pos.push(new Point(answer[i2], answer[i2 + n]));
-    vel.push(new Point(answer[i2 + 2 * n], answer[i2 + 3 * n]));
-  }
-  return { spinePosition: pos, spineVel: vel };
-}
-
 // scriptsDev/collide.tsx
 class detector {
   static blobloop = [
@@ -689,19 +178,19 @@ class detector {
   static getCurveBoundingBoxes(inputBString) {
     let count = inputBString.length;
     let curves = [];
-    for (var i2 = 0;i2 < count; i2++) {
-      curves.push(Curve.fromBSpline(inputBString[i2], inputBString[(i2 + 1) % count], inputBString[(i2 + 2) % count], inputBString[(i2 + 3) % count]));
+    for (var i = 0;i < count; i++) {
+      curves.push(Curve.fromBSpline(inputBString[i], inputBString[(i + 1) % count], inputBString[(i + 2) % count], inputBString[(i + 3) % count]));
     }
     return curves.map((o) => o.boundingBox()).map((o) => [o.lowest, o.highest]);
   }
   static AABB(col1, col2) {
     let returnIndecies = [];
-    for (var i2 = 0;i2 < col1.length; i2++) {
-      for (var j2 = 0;j2 < col2.length; j2++) {
-        let xCol = Math.max(col1[i2][0].x, col2[j2][0].x) <= Math.min(col1[i2][1].x, col2[j2][1].x);
-        let yCol = Math.max(col1[i2][0].y, col2[j2][0].y) <= Math.min(col1[i2][1].y, col2[j2][1].y);
+    for (var i = 0;i < col1.length; i++) {
+      for (var j = 0;j < col2.length; j++) {
+        let xCol = Math.max(col1[i][0].x, col2[j][0].x) <= Math.min(col1[i][1].x, col2[j][1].x);
+        let yCol = Math.max(col1[i][0].y, col2[j][0].y) <= Math.min(col1[i][1].y, col2[j][1].y);
         if (xCol && yCol) {
-          returnIndecies.push([i2, j2]);
+          returnIndecies.push([i, j]);
         }
       }
     }
@@ -788,23 +277,23 @@ class detector {
     if (Math.abs(upCount + downCount) < 2) {
       endPoints.push(i2[0]);
     }
-    for (var i3 = 0;i3 < candidates.length; i3++) {
+    for (var i = 0;i < candidates.length; i++) {
       let prevCount = upCount + downCount;
-      if (candidates[i3].line) {
-        upCount = candidates[i3].ingress;
+      if (candidates[i].line) {
+        upCount = candidates[i].ingress;
       } else {
-        downCount = candidates[i3].ingress;
+        downCount = candidates[i].ingress;
       }
       if (Math.abs(upCount + downCount) < 2 != Math.abs(prevCount) < 2) {
-        endPoints.push(candidates[i3].t);
+        endPoints.push(candidates[i].t);
       }
     }
     if (Math.abs(upCount + downCount) < 2) {
       endPoints.push(i2[1]);
     }
     var result = [];
-    for (var i3 = 0;i3 < endPoints.length; i3 += 2) {
-      result.push([endPoints[i3], endPoints[i3 + 1]]);
+    for (var i = 0;i < endPoints.length; i += 2) {
+      result.push([endPoints[i], endPoints[i + 1]]);
     }
     if (result.length == 1) {
       if (result[0][1] - result[0][0] > 0.8 * (i2[1] - i2[0])) {
@@ -826,67 +315,34 @@ class detector {
     let returner = [];
     if (depth % 2 == 0) {
       let refined = this.refineHybclip(curve2, curve1, i2, i1);
-      for (var i3 = 0;i3 < refined.length; i3++) {
-        let subResult = this.solveCollision(curve1, curve2, refined[i3], i2, depth - 1);
+      for (var i = 0;i < refined.length; i++) {
+        let subResult = this.solveCollision(curve1, curve2, refined[i], i2, depth - 1);
         returner = returner.concat(subResult);
       }
     } else {
       let refined = this.refineHybclip(curve1, curve2, i1, i2);
-      for (var i3 = 0;i3 < refined.length; i3++) {
-        let subResult = this.solveCollision(curve1, curve2, i1, refined[i3], depth - 1);
+      for (var i = 0;i < refined.length; i++) {
+        let subResult = this.solveCollision(curve1, curve2, i1, refined[i], depth - 1);
         returner = returner.concat(subResult);
       }
     }
     return returner;
   }
-  static dir1Force(curve1, curve2, t, u) {
-    let tc = curve1.coeff();
-    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
-    let uc = curve2.coeff();
-    let arrUc = [uc.t0, uc.t1, uc.t2, uc.t3];
-    let tsd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * t ** (i3 + j2)));
-    let tsd1 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) * t ** (i3 + j2 - 1) * arrTc[i3].x * arrTc[j2].y)).flat().reduce((a, b) => a + b);
-    let usd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2) * u ** (i3 + j2)));
-    let usd1 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) * u ** (i3 + j2 - 1) * arrUc[i3].x * arrUc[j2].y)).flat().reduce((a, b) => a + b);
-    let c1dir = curve1.value(curve1.coeff1Dir(), t);
-    let c2dir = curve2.value(curve2.coeff1Dir(), u);
-    let curve1Weights = [1, t, t ** 2, t ** 3];
-    let curve2Weights = [1, u, u ** 2, u ** 3];
-    let dirMat = [
-      [-c1dir.x, c2dir.x],
-      [-c1dir.y, c2dir.y]
-    ];
-    let det = dirMat[0][0] * dirMat[1][1] - dirMat[0][1] * dirMat[1][0];
-    if (Math.abs(det) < 0.001) {
-      return Array(2).fill(Array(4).fill(Point.zero));
-    }
-    let revDir = InvertMatrix(dirMat);
-    let xtcrut = tsd0.map((o, i3) => o.map((p, index) => -arrTc[index].y * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * curve1Weights[i3]).reduce((a, b) => a + b));
-    let ytcrut = tsd0.map((o, i3) => o.map((p, index) => arrTc[index].x * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] * curve1Weights[i3]).reduce((a, b) => a + b));
-    let xucrut = usd0.map((o, i3) => o.map((p, index) => -arrUc[index].y * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[0] * -curve2Weights[i3]).reduce((a, b) => a + b));
-    let yucrut = usd0.map((o, i3) => o.map((p, index) => arrUc[index].x * p).reduce((a, b) => a + b) + revDir.map((p, index) => [tsd1, usd1][index] * p[1] * -curve2Weights[i3]).reduce((a, b) => a + b));
-    let retT = [];
-    let retU = [];
-    for (var i2 = 0;i2 < 4; i2++) {
-      retT.push(new Point(xtcrut[i2], ytcrut[i2]));
-      retU.push(new Point(xucrut[i2], yucrut[i2]));
-    }
-    if (retT.some((o) => isNaN(o.x) || isNaN(o.y))) {
-      debugger;
-    }
-    return [retT, retU];
-  }
-  static shrinkCurve(curve) {
+  static shrinkCurve(curve, t) {
     let tc = curve.coeff();
-    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3];
-    let tsd0 = Array.from({ length: 4 }, () => Array(4).fill(0)).map((o, j2) => o.map((p, i3) => i3 + j2 == 0 ? 0 : (j2 - i3) / (i3 + j2)));
-    let xtcrut = tsd0.map((o) => o.map((p, index) => p * -arrTc[index].y).reduce((a, b) => a + b));
-    let ytcrut = tsd0.map((o) => o.map((p, index) => p * arrTc[index].x).reduce((a, b) => a + b));
-    let ret = [];
-    for (var i2 = 0;i2 < 4; i2++) {
-      ret.push(new Point(xtcrut[i2], ytcrut[i2]));
+    let arrTc = [tc.t0, tc.t1, tc.t2, tc.t3].map((o) => new Point(o.y, -o.x));
+    let returner = [];
+    for (var i = 0;i < 4; i++) {
+      let force = Point.zero;
+      for (var j = 0;j < 4; j++) {
+        if (i + j == 0) {
+          continue;
+        }
+        force = force.add(arrTc[j].scale(t ** (i + j) * j / (i + j)));
+      }
+      returner.push(force);
     }
-    return ret;
+    return returner;
   }
 }
 var collide_default = { detector };
